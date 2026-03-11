@@ -1,0 +1,381 @@
+﻿using ClipperLib;
+using GerberToQuspa.ViewModel;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
+
+namespace GerberToQuspa
+{
+    /// <summary>
+    /// 描画アイテムインターフェース
+    /// </summary>
+    public interface IDrawItem
+    {
+        IAperture Aperture { get; set; }
+        Geometry Geometry { get; set; }
+        Pen Stroke { get; set; }
+
+        void Draw(DrawingContext dc);
+        void DrawSelect(DrawingContext dc);
+        Rect GetBounds();
+        List<Point> CreateDispensePoints(OperationModel operationModel);
+
+        void Draw(StreamGeometryContext ctx);
+    }
+
+    /// <summary>
+    /// 線
+    /// </summary>
+    public class DrawLine : IDrawItem
+    {
+        public IAperture Aperture { get; set; } = null;
+        public Geometry Geometry { get; set; }
+        public Pen Stroke { get; set; }
+
+        private Point Start { get; set; }
+        private Point End { get; set; }
+
+        public DrawLine(Point start, Point end, double width, bool isLPD)
+        {
+            Start = start;
+            End = end;
+            Stroke = new Pen(isLPD ? Brushes.Green : Brushes.Black, width);
+            Stroke.StartLineCap = PenLineCap.Round;   // 始点を丸く
+            Stroke.EndLineCap = PenLineCap.Round;     // 終点を丸く
+            Stroke.Freeze();
+
+            CreateGeometry();
+        }
+
+        public void Draw(DrawingContext dc)
+        {
+            dc.DrawGeometry(null, Stroke, Geometry);
+        }
+
+        public void DrawSelect(DrawingContext dc)
+        {
+        }
+
+        public Rect GetBounds()
+        {
+            return new Rect(Start, End);
+        }
+
+        public List<Point> CreateDispensePoints(OperationModel operationModel)
+        {
+            return null;
+        }
+
+        private void CreateGeometry()
+        {
+            Geometry = new LineGeometry(Start, End);
+            Geometry.Freeze();
+        }
+
+        public void Draw(StreamGeometryContext ctx)
+        {
+            ctx.BeginFigure(Start, false, false);
+            ctx.LineTo(End, true, false);
+        }
+    }
+
+    /// <summary>
+    /// 円弧
+    /// </summary>
+    public class DrawArcLine : IDrawItem
+    {
+        public IAperture Aperture { get; set; } = null;
+        public Geometry Geometry { get; set; }
+        public Pen Stroke { get; set; }
+
+        private Point Start { get; set; }
+        private Point End { get; set; }
+        private Point Center { get; set; }
+        private bool IsCWArc { get; set; }
+        private double Radius { get; set; }
+
+        public DrawArcLine(Point start, Point end, double I, double J, double width, bool isCWArc, bool isLPD)
+        {
+            Start = start;
+            End = end;
+            Radius = Math.Sqrt(I * I + J * J);
+            Center = new Point(Start.X + I, Start.Y + J);
+            IsCWArc = isCWArc;
+            Stroke = new Pen(isLPD ? Brushes.Green : Brushes.Black, width);
+            Stroke.StartLineCap = PenLineCap.Round;   // 始点を丸く
+            Stroke.EndLineCap = PenLineCap.Round;     // 終点を丸く
+            Stroke.Freeze();
+            CreateGeometry();
+        }
+
+        public void Draw(DrawingContext dc)
+        {
+            dc.DrawGeometry(null, Stroke, Geometry);
+        }
+
+        public void DrawSelect(DrawingContext dc)
+        {
+        }
+
+        public Rect GetBounds()
+        {
+            return new Rect(Start, End);
+        }
+
+        public List<Point> CreateDispensePoints(OperationModel operationModel)
+        {
+            return null;
+        }
+
+        private void CreateGeometry()
+        {
+            StreamGeometry geo = new StreamGeometry();
+            using (StreamGeometryContext ctx = geo.Open())
+            {
+                ctx.BeginFigure(Start, false, false);
+
+                // 始点・終点を中心座標系に変換
+                Vector startVector = Start - Center;
+                Vector endVector = End - Center;
+
+                // 始点・終点角度
+                double startAngle = Math.Atan2(startVector.Y, startVector.X);
+                double endAngle = Math.Atan2(endVector.Y, endVector.X);
+
+                // SweepDirection
+                SweepDirection sweep = (IsCWArc) ? SweepDirection.Counterclockwise : SweepDirection.Clockwise;
+
+                // ArcSegment作成
+                ArcSegment arc = new ArcSegment(
+                    End,
+                    new Size(Radius, Radius),
+                    0,          // 回転角度
+                    false,
+                    sweep,
+                    true        // isStroked
+                );
+
+                ctx.ArcTo(arc.Point, arc.Size, arc.RotationAngle, arc.IsLargeArc, arc.SweepDirection, true, false);
+            }
+
+            Geometry = geo;
+            Geometry.Freeze();
+        }
+
+        public void Draw(StreamGeometryContext ctx)
+        {
+            ctx.BeginFigure(Start, false, false);
+
+            // 始点・終点を中心座標系に変換
+            Vector startVector = Start - Center;
+            Vector endVector = End - Center;
+
+            // 始点・終点角度
+            double startAngle = Math.Atan2(startVector.Y, startVector.X);
+            double endAngle = Math.Atan2(endVector.Y, endVector.X);
+
+            // SweepDirection
+            SweepDirection sweep = (IsCWArc) ? SweepDirection.Counterclockwise : SweepDirection.Clockwise;
+
+            // ArcSegment作成
+            ArcSegment arc = new ArcSegment(
+                End,
+                new Size(Radius, Radius),
+                0,          // 回転角度
+                false,
+                sweep,
+                true        // isStroked
+            );
+
+            ctx.ArcTo(arc.Point, arc.Size, arc.RotationAngle, arc.IsLargeArc, arc.SweepDirection, true, false);
+        }
+    }
+
+    /// <summary>
+    /// パッド
+    /// </summary>
+    public class DrawPad : IDrawItem
+    {
+        public IAperture Aperture { get; set; } = null;
+        public Geometry Geometry { get; set; }
+        public Pen Stroke { get; set; }
+
+        private Point Pos { get; set; }
+        private Brush Fill { get; set; } = Brushes.Green;
+ 
+        public DrawPad(IAperture aperture, Point pos, bool isLPD)
+        {
+            Aperture = aperture;
+            Fill = isLPD ? Brushes.Green : Brushes.Black;
+            Fill.Freeze();
+            Stroke = new Pen(isLPD ? Brushes.Green : Brushes.Black, 1);
+            Stroke.Freeze();
+
+            Geometry = Aperture.CreateGeometry(pos, isLPD);
+            Geometry.Freeze();
+
+            Pos = pos;
+        }
+
+        public void Draw(DrawingContext dc)
+        {
+            dc.DrawGeometry(Fill, Stroke, Geometry);
+        }
+
+        public void DrawSelect(DrawingContext dc)
+        {
+            Pen newPen = Stroke.Clone();
+            Brush newBrush = Fill.Clone();
+            if (Stroke.Brush == Brushes.Green)
+            {
+                newPen.Brush = Brushes.White;
+                newBrush = Brushes.White;
+            }
+            dc.DrawGeometry(newBrush, newPen, Geometry);
+        }
+
+        public Rect GetBounds()
+        {
+            return Geometry.Bounds;
+        }
+
+        public List<Point> CreateDispensePoints(OperationModel operationModel)
+        {
+            //return null;
+            return (operationModel.IsAutoPlace) ? AutoPlaceDispensePoints(operationModel) : ManualPlaceDispensePoints(operationModel);
+        }
+
+        /// <summary>
+        /// 塗布点をパッド上に自動配置
+        /// </summary>
+        /// <param name="condition"></param>
+        /// <returns></returns>
+        private List<Point> AutoPlaceDispensePoints(OperationModel operationModel)
+        {
+            double pitchX = operationModel.Px * 1000;
+            double pitchY = operationModel.Py * 1000;
+
+            var patterns = new[]
+            {
+                Tuple.Create(0.0, 0.0),
+                Tuple.Create(pitchX / 2, 0.0),
+                Tuple.Create(0.0, pitchY / 2),
+                Tuple.Create(pitchX / 2, pitchY / 2)
+            };
+
+            List<Point> best = null;
+            int bestCount = 0;
+            foreach (var p in patterns)
+            {
+                var circles = PlaceCircles(Geometry, operationModel.Size * 1000, pitchX, pitchY, p.Item1, p.Item2);
+                if (circles.Count > bestCount)
+                {
+                    bestCount = circles.Count;
+                    best = circles;
+                }
+            }
+
+            // 中心合わせ
+            Rect bounds = Geometry.Bounds;
+            Point geometryCenter = new Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2);
+            Point circlesCenter = new Point(best.Average(c => c.X), best.Average(c => c.Y));
+
+            Vector offset = geometryCenter - circlesCenter;
+            for (int i = 0; i < best.Count; i++)
+            {
+                Point p = best[i] + offset;
+                // Y反転
+                p.Y *= -1;
+                best[i] = p;
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// パッド内に収まるかをチェック
+        /// </summary>
+        /// <param name="union"></param>
+        /// <param name="radius"></param>
+        /// <param name="pitchX"></param>
+        /// <param name="pitchY"></param>
+        /// <param name="offsetX"></param>
+        /// <param name="offsetY"></param>
+        /// <returns></returns>
+        private List<Point> PlaceCircles(Geometry union, double radius, double pitchX, double pitchY, double offsetX, double offsetY)
+        {
+            var result = new List<Point>();
+
+            Rect bounds = union.Bounds;
+
+            for (double y = bounds.Top + offsetY; y <= bounds.Bottom; y += pitchY)
+            {
+                for (double x = bounds.Left + offsetX; x <= bounds.Right; x += pitchX)
+                {
+                    Point center = new Point(x, y);
+
+                    // まず中心だけチェック（超高速）
+                    if (!union.FillContains(center))
+                    {
+                        continue;
+                    }
+
+                    double r = radius * 0.707106; // √2/2
+                    if (!union.FillContains(new Point(center.X + r, center.Y + r))) continue;
+                    if (!union.FillContains(new Point(center.X - r, center.Y + r))) continue;
+                    if (!union.FillContains(new Point(center.X + r, center.Y - r))) continue;
+                    if (!union.FillContains(new Point(center.X - r, center.Y - r))) continue;
+
+                    result.Add(center);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 塗布点をパッド上に個数指定して配置
+        /// </summary>
+        /// <param name="condition"></param>
+        /// <returns></returns>
+        private List<Point> ManualPlaceDispensePoints(OperationModel operationModel)
+        {
+            Rect bounds = Geometry.Bounds;
+
+            double pitchX = bounds.Width / operationModel.CountX;
+            double pitchY = bounds.Height / operationModel.CountY;
+
+            List<Point> dispensePoints = new List<Point>();
+            for (int i = 0; i < operationModel.CountX; i++)
+            {
+                for (int j = 0; j < operationModel.CountY; j++)
+                {
+                    dispensePoints.Add(new Point(i * pitchX, j * pitchY));
+                }
+            }
+
+            Point geometryCenter = new Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2);
+            Point pointCenter = new Point(dispensePoints.Average(c => c.X), dispensePoints.Average(c => c.Y));
+
+            Vector offset = geometryCenter - pointCenter;
+            for (int i = 0; i < dispensePoints.Count; i++)
+            {
+                Point p = dispensePoints[i] + offset;
+                // Y反転
+                p.Y *= -1;
+                dispensePoints[i] = p;
+            }
+            return dispensePoints;
+        }
+
+        public void Draw(StreamGeometryContext ctx)
+        {
+            Aperture.Draw(Pos, ctx);
+        }
+    }
+}

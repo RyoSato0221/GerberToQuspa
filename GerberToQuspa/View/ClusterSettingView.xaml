@@ -1,0 +1,47 @@
+﻿<UserControl x:Class="GerberToQuspa.View.ClusterSettingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:GerberToQuspa"
+             xmlns:view="clr-namespace:GerberToQuspa.View"
+             xmlns:vm="clr-namespace:GerberToQuspa.ViewModel"
+             mc:Ignorable="d" 
+             >
+    
+    <Grid Background="White">
+        <StackPanel Orientation="Vertical" Margin="16">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="クラスタリング範囲(mm)" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                <local:CustomCheckBox Style="{StaticResource CustomCheckBoxStyle}" Content="自動" IsChecked="{Binding IsEpsAuto}" Margin="16,0,0,0"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="16,5">
+                <StackPanel Orientation="Horizontal" IsEnabled="{Binding IsEpsAuto, Converter={StaticResource BooleanInvertConverter}}">
+                    <TextBlock Text="X方向：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" />
+                    <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding EpsX, FallbackValue=3.000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                    <TextBlock Text="Y方向：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding EpsY, FallbackValue=3.000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                </StackPanel>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="クラスタリング最小ポイント数" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                <TextBox Style="{StaticResource CustomTextBoxStyle}" Margin="16,0,0,0" Width="75" Text="{Binding ClusterMinSamples, FallbackValue=3, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                 IsReadOnly="true" Padding="1,1,24,1"/>
+                <StackPanel Margin="2,0,0,0">
+                    <Button Style="{StaticResource StandardIconButton}" Tag="&#xeb11;" Command="{Binding ClusterMinSamplesUpCommand}"/>
+                    <Button Style="{StaticResource StandardIconButton}" Tag="&#xeb0f;" Command="{Binding ClusterMinSamplesDownCommand}" ToolTip="Fit"/>
+                </StackPanel>
+            </StackPanel>
+            <TextBlock Text="クラスタ内の並び替え優先度" Style="{StaticResource BodyLarge}" Margin="0,5"/>
+            <StackPanel Orientation="Horizontal" Margin="16,5">
+                <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="自動(折返し数優先)" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.Auto_Turn}}" Width="200"/>
+                <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="自動(距離優先)" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.Auto_Distance}}" Width="200"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="16,5">
+                <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="X方向" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.X}}" Width="200"/>
+                <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="Y方向" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.Y}}" Width="200"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+    
+</UserControl>

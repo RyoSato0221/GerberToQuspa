@@ -1,0 +1,105 @@
+﻿<Window x:Class="GerberToQuspa.View.CustomMessageBoxView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:GerberToQuspa"
+        xmlns:view="clr-namespace:GerberToQuspa.View"
+        xmlns:vm="clr-namespace:GerberToQuspa.ViewModel"
+        mc:Ignorable="d"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        SizeToContent="WidthAndHeight"
+        Height="230" Width="540" MinWidth="540" MinHeight="230" MaxHeight="600" FontSize="16" Background="Transparent"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize">
+
+    <Window.Resources>
+        <!-- ボタンのスタイル定義 -->
+        <Style x:Key="StateButton" TargetType="Button">
+            <Setter Property="Margin" Value="24,0,0,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <TextBlock Style="{StaticResource IconLarge}" Text="{TemplateBinding Tag}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding State}" Value="Info">
+                    <Setter Property="Tag" Value="&#xF167;" />
+                    <Setter Property="Foreground" Value="{StaticResource Light/Fill Color/System/Attention}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Warning">
+                    <Setter Property="Tag" Value="&#xE814;" />
+                    <Setter Property="Foreground" Value="{StaticResource Light/Fill Color/System/Caution}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Error">
+                    <Setter Property="Tag" Value="&#xEB90;" />
+                    <Setter Property="Foreground" Value="{StaticResource Light/Fill Color/System/Critical}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Border Style="{StaticResource WindowFrame}" Background="#FFFFFF">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="40"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="80"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" >
+                    <ContentControl Style="{StaticResource SubTitleBarStyle}" Content="{Binding Title, FallbackValue='Title'}"  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" />
+                </Grid>
+
+                <Grid Grid.Row="1" Background="#FFFFFF">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="56"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="72"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0" Grid.Row="0">
+                        <Button Style="{StaticResource StateButton}"/>
+                    </Grid>
+                    <Grid Grid.Column="1" Grid.Row="0">
+                        <TextBlock Style="{StaticResource BodyLargeStrong}" Text="{Binding Message, FallbackValue='Message'}" VerticalAlignment="Center" Margin="0,0,24,0"/>
+                    </Grid>
+                    <Grid Grid.Column="1" Grid.Row="1">
+                        <TextBlock Style="{StaticResource BodyLargeStrong}" Text="{Binding SubMessage, FallbackValue='SubMessage'}" VerticalAlignment="Top" Margin="0,0,32,16"/>
+                    </Grid>
+                </Grid>
+
+                <Grid Grid.Row="2">
+                    <Border CornerRadius="0,0,10,10" BorderBrush="#23000000" BorderThickness="1" Background="#F3F3F3">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Style="{StaticResource StandardTextButton}" Content="Yes" Margin="0,0,24,0"
+                                    Command="{Binding SelectYesCommand}" 
+                                    CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}" 
+                                    Visibility="{Binding Style, Converter={StaticResource EnumEqualsToCollapsedConverter}, ConverterParameter={x:Static vm:eMessageStyle.OK}}"/>
+                            <Button Style="{StaticResource StandardTextButton}" Content="No" Margin="0,15,24,15"
+                                    Command="{Binding SelectNoCommand}" 
+                                    CommandParameter="{Binding RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                    Visibility="{Binding Style, ConverterParameter={x:Static vm:eMessageStyle.OK}, Converter={StaticResource EnumEqualsToCollapsedConverter}}"/>
+                            <Button Style="{StaticResource StandardTextButton}" Content="Cancel" Margin="0,0,24,0"
+                                    Command="{Binding SelectCancelCommand}" 
+                                    CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Visibility="{Binding Style, Converter={StaticResource EnumToVisibilityConverter}, ConverterParameter={x:Static vm:eMessageStyle.YesNoCancel}}"/>
+                            <Button Style="{StaticResource StandardTextButton}" Content="OK" Margin="0,0,24,0" IsDefault="True"
+                                    Command="{Binding SelectOkCommand}" 
+                                    CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}" 
+                                    Visibility="{Binding Style, Converter={StaticResource EnumToVisibilityConverter}, ConverterParameter={x:Static vm:eMessageStyle.OK}}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

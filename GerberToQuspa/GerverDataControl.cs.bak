@@ -1,0 +1,817 @@
+﻿using GerverToQuspa.ViewModel;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+
+namespace GerverToQuspa
+{
+    public enum MoveMode { Move, Draw, Flash }
+    public enum InterpMode { None, Linear, CWArc, CCWArc }
+
+    /// <summary>
+    /// 座標変換クラス
+    /// </summary>
+    public class CoordinateTransformer
+    {
+        public enum eParseType { X, Y, Size }
+
+        private bool LeadingZeros { get; set; } = true;          // 先頭ゼロ省略
+        private bool AbsoluteCoordinates { get; set; } = true;   // 絶対座標
+        private int IntX { get; set; } = 6;                      // X座標整数桁数
+        private int DecX { get; set; } = 6;                      // X座標少数桁数
+        private int IntY { get; set; } = 6;                      // Y座標整数桁数
+        private int DecY { get; set; } = 6;                      // Y座標少数桁数
+        private bool IsMetric = true;                            // MM=true, IN=false
+        private int BaseDec;   // 内部基準小数桁
+
+        /// <summary>
+        /// 単位設定
+        /// </summary>
+        /// <param name="line"></param>
+        public void SetScale(string line)
+        {
+            IsMetric = line.Contains("MM");
+        }
+
+        /// <summary>
+        /// フォーマット設定
+        /// </summary>
+        /// <param name="line"></param>
+        public void SetFormat(string line)
+        {
+            // L/T判定
+            LeadingZeros = line.Contains("L");
+            // A/I判定
+            AbsoluteCoordinates = line.Contains("A");
+            // XとYの整数・小数桁数
+            var match = Regex.Match(line, @"X(\d)(\d)Y(\d)(\d)");
+            if (match.Success)
+            {
+                IntX = int.Parse(match.Groups[1].Value);
+                DecX = int.Parse(match.Groups[2].Value);
+                IntY = int.Parse(match.Groups[3].Value);
+                DecY = int.Parse(match.Groups[4].Value);
+                BaseDec = Math.Max(DecX, DecY);
+            }
+        }
+
+        /// <summary>
+        /// X座標の変換
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public long ConvertX(string str)
+        {
+            return Convert(str, IntX, DecX);
+        }
+
+        /// <summary>
+        /// Y座標の変換
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public long ConvertY(string str)
+        {
+            return Convert(str, IntY, DecY);
+        }
+
+        /// <summary>
+        /// 座標変換
+        /// </summary>
+        /// <param name="coordStr"></param>
+        /// <param name="intDigits"></param>
+        /// <param name="decDigits"></param>
+        /// <returns></returns>
+        private long Convert(string coordStr, int intDigits, int decDigits)
+        {
+            // 符号を判定
+            bool negative = coordStr.StartsWith("-");
+            if (negative)
+            {
+                coordStr = coordStr.Substring(1);
+            }
+
+            int totalDigits = intDigits + decDigits;
+
+            // 必要桁に満たない場合は前ゼロ補完
+            if (LeadingZeros)
+            {
+                coordStr = coordStr.PadLeft(totalDigits, '0');
+            }
+            else
+            {
+                coordStr = coordStr.PadRight(totalDigits, '0');
+            }
+
+            // 変換
+            long raw = ConvertMetric(long.Parse(coordStr), decDigits);
+            return negative ? -raw : raw;
+        }
+
+        /// <summary>
+        /// プリミティブパラメータの解析
+        /// </summary>
+        public double ParsePrimitiveParamX(string primitiveParam, List<double> param)
+        {
+            return ConvertX(ParsePrimitiveParam(primitiveParam, param));
+        }
+
+        public double ParsePrimitiveParamY(string primitiveParam, List<double> param)
+        {
+            return ConvertY(ParsePrimitiveParam(primitiveParam, param));
+        }
+
+        public double ParsePrimitiveParamSize(string primitiveParam, List<double> param)
+        {
+            return ConvertMetric(long.Parse(ParsePrimitiveParam(primitiveParam, param)), BaseDec);
+        }
+
+        public string ParsePrimitiveParam(string primitiveParam, List<double> param)
+        {
+            var match = Regex.Match(primitiveParam, @"^\$(\d+)");
+            if (match.Success)
+            {
+                return param[int.Parse(match.Groups[1].Value) - 1].ToString();
+            }
+            else
+            {
+                return primitiveParam;
+            }
+        }
+
+        long ConvertMetric(long raw, int dec)
+        {
+            if (IsMetric)
+            {
+                return raw * Pow10(dec);
+            }
+            else
+            {
+                return raw * 254 * Pow10(dec - 1);
+            }
+        }
+        
+        private long Pow10(int n)
+        {
+            long v = 1;
+            for (int i = 0; i < n; i++)
+            {
+                v *= 10;
+            }
+            return v;
+        }
+    }
+
+    /// <summary>
+    /// ガーバーデータ解析クラス
+    /// </summary>
+    class GerverDataControl
+    {
+        public class GerberFile
+        {
+            public Dictionary<string, IAperture> Apertures { get; } = new Dictionary<string, IAperture>();
+            public List<Macro> Macros { get; } = new List<Macro>(); 
+        }
+
+        public class ProgressUnit
+        {
+            public FileStream Fs;
+            public StreamReader Reader;
+            public IProgress<ProgressReportMessage> Progress;
+            public long totalBytes;
+            private int readCount = 0;
+            private ProgressReportMessage reportMessage;
+
+            public ProgressUnit(FileStream fs, StreamReader reader, IProgress<ProgressReportMessage> progress, int resolution)
+            {
+                Fs = fs;
+                Reader = reader;
+                Progress = progress;
+                totalBytes = fs.Length;
+                reportMessage = new ProgressReportMessage();
+                reportMessage.Message = (resolution == 1000) ? "ガーバーデータ解析中" : "サイズを最適化しています";
+            }
+
+            public string ReadLine()
+            {
+                string line = Reader.ReadLine();
+                if (line == null)
+                {
+                    // ファイル終端時に最終進捗を報告
+                    reportMessage.Percent = 100.0;
+                    Progress.Report(reportMessage);
+                    return null;
+                }
+
+                string dataEnd = (line.StartsWith("%")) ? "*%" : "*";
+                while (!line.EndsWith(dataEnd))
+                {
+                    string next = Reader.ReadLine();
+                    if (next == null) break; // 安全策
+                    line += next;
+                }
+
+                // 10行ごと、または終端近くで進捗更新
+                if (readCount % 10 == 0 || Fs.Position >= totalBytes)
+                {
+                    reportMessage.Percent = (double)Fs.Position / totalBytes * 100.0;
+                    Progress.Report(reportMessage);
+                }
+
+                readCount++;
+                return line;
+            }
+        }
+
+        private GerberFile file = new GerberFile();
+        private string currentDCode = null;
+        private CoordinateTransformer CoordinateTransformer = new CoordinateTransformer();
+            
+        public string FilePath { get; set; }
+
+        /// <summary>
+        /// ガーバーデータの解析開始
+        /// </summary>
+        /// <param name="progress"></param>
+        /// <param name="token"></param>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public async Task<GerberAnalysisData> AnalysisStarts(IProgress<ProgressReportMessage> progress)
+        {
+            // ファイル読み込みの実行
+            GerberAnalysisData AnalysisData = await Task.Run(() => ReadFile(progress, 1000));            
+            return AnalysisData;
+        }
+        
+        /// <summary>
+        /// ファイル読み込み
+        /// </summary>       
+        public async Task<GerberAnalysisData> ReadFile(IProgress<ProgressReportMessage> progress, int resolution)
+        {
+            GerberAnalysisData AnalysisData = new GerberAnalysisData()
+            {
+                Resolution = resolution,
+                DrawItems = new List<IDrawItem>(),
+            };
+
+            Point currentPos = new Point();
+            InterpMode currentInterp = InterpMode.Linear;
+            MoveMode currentMode = MoveMode.Draw;
+            bool isLPD = true;
+
+            file = new GerberFile();            
+                                   
+            using (var fs = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var reader = new StreamReader(fs))
+            {
+                var unit = new ProgressUnit(fs, reader, progress, resolution);
+
+                string line;
+                while ((line = unit.ReadLine()) != null)
+                {                    
+                    // 単位設定
+                    if (line.StartsWith("%MO"))
+                    {
+                        CoordinateTransformer.SetScale(line);
+                        continue;
+                    }
+
+                    // フォーマット定義
+                    if (line.StartsWith("%FS"))
+                    {
+                        CoordinateTransformer.SetFormat(line);
+                        continue;
+                    }
+
+                    // アパーチャ定義
+                    if (line.StartsWith("%AD"))
+                    {
+                        ParseAperture(line);
+                        continue;
+                    }
+
+                    // アパーチャマクロ定義
+                    if (line.StartsWith("%AM"))
+                    {
+                        var apertureMacro = ParseApertureMacro(line);
+                        if (apertureMacro != null) file.Macros.Add(apertureMacro);
+                        continue;
+                    }
+
+                    // Dコードの切替
+                    if (line.StartsWith("D") || line.StartsWith("G54"))
+                    {
+                        var dMatch = Regex.Match(line, @"D(\d+)");
+                        currentDCode = dMatch.Groups[1].Value;
+                        continue;
+                    }
+
+                    // リージョンステートメント
+                    if (line.StartsWith("G36"))
+                    {
+                        ParseRegionStatement(ref currentPos, ref AnalysisData, unit);
+                        continue;
+                    }
+
+                    // Dコードの切替
+                    if (line.StartsWith("%LP"))
+                    {
+                        isLPD = (line.Contains("D"));
+                        continue;
+                    }
+
+                    // Dコード
+                    if (line.Contains("D01") || line.Contains("D1")) currentMode = MoveMode.Draw;
+                    if (line.Contains("D02") || line.Contains("D2")) currentMode = MoveMode.Move;
+                    if (line.Contains("D03") || line.Contains("D3")) currentMode = MoveMode.Flash;
+
+                    // Gコード
+                    if (line.Contains("G01") || line.Contains("G1")) currentInterp = InterpMode.Linear;
+                    if (line.Contains("G02") || line.Contains("G2")) currentInterp = InterpMode.CWArc;
+                    if (line.Contains("G03") || line.Contains("G3")) currentInterp = InterpMode.CCWArc;
+
+                    // 座標抽出                                    
+                    if (line.StartsWith("X") || line.StartsWith("Y") || line.StartsWith("G01") || line.StartsWith("G02") || line.StartsWith("G03") || line.StartsWith("G1") || line.StartsWith("G2") || line.StartsWith("G3"))
+                    {
+                        var xMatch = Regex.Match(line, @"X(-?\d+)");
+                        var yMatch = Regex.Match(line, @"Y(-?\d+)");
+                        var iMatch = Regex.Match(line, @"I(-?\d+)");
+                        var jMatch = Regex.Match(line, @"J(-?\d+)");
+
+                        if (!xMatch.Success && !yMatch.Success && !iMatch.Success && !jMatch.Success)
+                        {
+                            continue;
+                        }
+
+                        double x = xMatch.Success ? CoordinateTransformer.ConvertX(xMatch.Groups[1].Value) : currentPos.X;
+                        double y = yMatch.Success ? CoordinateTransformer.ConvertY(yMatch.Groups[1].Value) : currentPos.Y;
+                        double i = iMatch.Success ? CoordinateTransformer.ConvertX(iMatch.Groups[1].Value) : 0;
+                        double j = jMatch.Success ? CoordinateTransformer.ConvertY(jMatch.Groups[1].Value) : 0;
+
+                        if(currentDCode != null)
+                        {
+                            IAperture aperture;
+                            if (file.Apertures.TryGetValue(currentDCode, out aperture))
+                            {
+                            }
+                            else
+                            {
+                            }
+
+                            if (currentMode == MoveMode.Draw)
+                            {
+                                if (currentInterp == InterpMode.Linear)
+                                {
+                                    AnalysisData.DrawItems.Add(new DrawLine(currentPos, new Point(x, y), aperture.GetWidth(), isLPD));
+                                }
+                                else if (currentInterp == InterpMode.CWArc)
+                                {
+                                    AnalysisData.DrawItems.Add(new DrawArcLine(currentPos, new Point(x, y), i, j, aperture.GetWidth(), true, isLPD));
+                                }
+                                else if (currentInterp == InterpMode.CCWArc)
+                                {
+                                    AnalysisData.DrawItems.Add(new DrawArcLine(currentPos, new Point(x, y), i, j, aperture.GetWidth(), false, isLPD));
+                                }
+                            }
+                            else if (currentMode == MoveMode.Flash)
+                            {
+                                IDrawItem item;
+                                item = new DrawPad(aperture, new Point(x, y), isLPD);
+                                AnalysisData.DrawItems.Add(item);
+                            }
+                        }
+                        currentPos.X = x;
+                        currentPos.Y = y;
+                    }
+                }
+                // スレッドからアクセスできるようにFreezeする
+                foreach (var item in AnalysisData.DrawItems)
+                {
+                    item.Freeze();
+                    item.CreateGeometry();
+                }
+            }
+            AnalysisData.CreareContentBounds();
+            return AnalysisData;
+        }        
+
+        /// <summary>
+        /// アパーチャの解析
+        /// </summary>
+        /// <param name="line"></param>
+        private void ParseAperture(string item)
+        {
+            var match = Regex.Match(item, @"%ADD(\d+)([A-Za-z0-9_ ]+)(?:,([\d\.\,Xx]+))?\*%");
+            if (!match.Success) return;
+
+            IAperture aperture;
+            switch (match.Groups[2].Value)
+            {
+                case "C":   // 円アパーチャ
+                    aperture = new ApertureCircle();
+                    break;
+                case "R":   // 長方形アパーチャ
+                    aperture = new ApertureRect();
+                    break;
+                case "O":   // 楕円形アパーチャ
+                    aperture = new ApertureObround();
+                    break;
+                case "P":   // 多角形アパーチャ
+                    aperture = new AperturePolygon();
+                    break;
+                default:    // アパーチャマクロ
+                    var macro = file.Macros.FirstOrDefault(p => p.Name == match.Groups[2].Value);
+                    aperture = new ApertureMacro(macro);
+                    break;
+            }
+
+            List<long> paramList = match.Groups[3].Value
+                .Split(new char[] { 'X', 'x', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => long.Parse(s, CultureInfo.InvariantCulture))
+                .ToList();
+            aperture.SetParameter(paramList, CoordinateTransformer);
+
+            file.Apertures.Add(match.Groups[1].Value, aperture);            
+        }
+
+        /// <summary>
+        /// アパーチャマクロの解析
+        /// </summary>
+        /// <param name="item"></param>
+        /// <param name="parts"></param>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        private Macro ParseApertureMacro(string item)
+        {
+            // マクロを分割
+            string[] parts = item.Split('*');
+
+            // %AMROUNDEDRECT10*20,1,1.2,...*%
+            var match = Regex.Match(parts[0], @"%AM(.+)");
+            if (!match.Success) return null;
+
+            Macro macro = new Macro();
+            macro.Name = match.Groups[1].Value;
+
+            IPrimitive primitive = null;
+            string str;
+            int index = 1;
+            do
+            {                
+                str = parts[index];
+                string preprocessed = Regex.Replace(str, "%", "");   // 改行を削除
+                if (str.StartsWith("G04"))
+                {
+                    continue;   // コメント行はスキップ
+                }
+
+                List<string> buf = preprocessed.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                if(buf.Count() > 0)
+                {
+                    switch (buf[0])
+                    {
+                        case "0":   // コメント
+                            break;
+                        case "1":   // 円プリミティブ
+                            primitive = new CirclePrimitive();
+                            break;
+                        case "20":  // ベクターラインプリミティブ
+                            primitive = new VectorLinePrimitive();
+                            break;
+                        case "21":  // センターラインプリミティブ
+                            primitive = new CenterLinePrimitive();                            
+                            break;
+                        case "4":   // アウトラインプリミティブ
+                            primitive = new OutLinePrimitive();
+                            break;
+                        case "5":
+                            break;
+                        case "7":   // サーマルパッド（ドーナッツ状パッド）
+                            primitive = new ThermalPrimitive();
+                            break;
+                    }
+                    if (primitive != null)
+                    {
+                        primitive.SetParameter(buf, CoordinateTransformer);
+                        macro.Primitives.Add(primitive);
+                    }
+                }
+                index++;
+            } while (!str.EndsWith("%"));
+
+            return macro;
+        }
+
+        /// <summary>
+        /// リージョンステートメントの解析
+        /// </summary>        
+        /// <param name="parts"></param>
+        /// <param name="index"></param>
+        private void ParseRegionStatement(ref Point currentPos, ref GerberAnalysisData data, ProgressUnit unit)
+        {                        
+            InterpMode mode = InterpMode.Linear;
+            string str;
+            List<PolygonPoint> points = new List<PolygonPoint>();
+            do
+            {
+                str = unit.ReadLine();
+                if (str == null || str.StartsWith("G37"))
+                {
+                    break;
+                }
+                if (str.Contains("G01") || str.Contains("G1")) mode = InterpMode.Linear;
+                if (str.Contains("G02") || str.Contains("G2")) mode = InterpMode.CWArc;
+                if (str.Contains("G03") || str.Contains("G3")) mode = InterpMode.CCWArc;
+
+                var xMatch = Regex.Match(str, @"X(-?\d+)");
+                var yMatch = Regex.Match(str, @"Y(-?\d+)");
+                var iMatch = Regex.Match(str, @"I(-?\d+)");
+                var jMatch = Regex.Match(str, @"J(-?\d+)");
+
+                double x = xMatch.Success ? CoordinateTransformer.ConvertX(xMatch.Groups[1].Value) : currentPos.X;
+                double y = yMatch.Success ? CoordinateTransformer.ConvertY(yMatch.Groups[1].Value) : currentPos.Y;
+                double i = iMatch.Success ? CoordinateTransformer.ConvertX(iMatch.Groups[1].Value) : 0;
+                double j = jMatch.Success ? CoordinateTransformer.ConvertY(jMatch.Groups[1].Value) : 0;
+
+                // 座標抽出                                    
+                if (str.StartsWith("X") || str.StartsWith("Y") || str.StartsWith("G01") || str.StartsWith("G02") || str.StartsWith("G03") || str.StartsWith("G1") || str.StartsWith("G2") || str.StartsWith("G3"))
+                {
+                    PolygonPoint item = new PolygonPoint
+                    {
+                        mode = mode,
+                        point = new Point(x, y),
+                        centerOffset = new Point(i, j),
+                    };
+                    points.Add(item);
+                }
+                currentPos.X = x;
+                currentPos.Y = y;
+            } while (true);
+
+            // 中心（重心）
+            Point center = new Point(points.Average(p => p.point.X), points.Average(p => p.point.Y));
+            Vector offset = new Vector(center.X, center.Y);
+
+            // 全点を移動
+            for (int i = 0; i < points.Count; i++)
+            {
+                points[i].point -= offset;
+            }
+
+            // key生成
+            var sb = new StringBuilder("RS");
+            foreach (var p in points)
+            {
+                sb.Append($"_{p.mode}:");
+                sb.Append($"{p.point.X}:");
+                sb.Append($"{p.point.Y}:");
+                sb.Append($"{p.centerOffset.X}:");
+                sb.Append($"{p.centerOffset.Y}:");
+            }
+            string key = sb.ToString();
+
+            IAperture aperture;
+            if (!file.Apertures.TryGetValue(key, out aperture))
+            {
+                aperture = new ApertureRS();
+                ((ApertureRS)aperture).points = points;
+                file.Apertures.Add(key, aperture);
+            }
+            data.DrawItems.Add(new DrawPad(aperture, center, true));
+        }        
+    }
+
+    /// <summary>
+    /// 解析済みガーバーデータ
+    /// </summary>
+    class GerberAnalysisData
+    {
+        public int Resolution { get; set; } = 1000;
+        public List<IDrawItem> DrawItems = new List<IDrawItem>();
+        public List<IDrawItem> SelectItems = new List<IDrawItem>();
+        public ImageSource ImageSource = null;
+           
+        private Rect _contentBounds = Rect.Empty;
+        public Rect ContentBounds => _contentBounds;
+
+        public DrawingVisual CreateGerberVisual()
+        {
+            var dv = new DrawingVisual();
+
+            using (var dc = dv.RenderOpen())
+            {
+                dc.PushTransform(new TranslateTransform(-ContentBounds.BottomLeft.X, ContentBounds.BottomLeft.Y));
+                dc.PushTransform(new ScaleTransform(1, -1));
+
+                dc.DrawRectangle(
+                    Brushes.Transparent,
+                    new Pen(Brushes.LightBlue, 2),
+                    ContentBounds);
+
+                foreach (var item in DrawItems)
+                {
+                    item.Draw(dc);
+                }
+
+                dc.Pop();
+                dc.Pop();
+            }
+
+            return dv;
+        }
+
+        public DrawingVisual CreateSelectGerberVisual()
+        {
+            var dv = new DrawingVisual();
+
+            using (var dc = dv.RenderOpen())
+            {
+                dc.PushTransform(new TranslateTransform(-ContentBounds.BottomLeft.X, ContentBounds.BottomLeft.Y));
+                dc.PushTransform(new ScaleTransform(1, -1));
+
+                foreach (var item in SelectItems)
+                {
+                    item.DrawSelect(dc);
+                }
+
+                dc.Pop();
+                dc.Pop();
+            }
+
+            return dv;
+        }
+
+        /// <summary>
+        /// ビットマップの生成
+        /// </summary>
+        /// <returns></returns>
+        //public void CreateBitmap()
+        //{            
+        //    var dv = new DrawingVisual();
+        //    using (var dc = dv.RenderOpen())
+        //    {                
+        //        dc.PushTransform(new TranslateTransform(-ContentBounds.BottomLeft.X, ContentBounds.BottomLeft.Y));                
+        //        dc.PushTransform(new ScaleTransform(1, -1));
+        //        dc.DrawRectangle(Brushes.Transparent, new Pen(Brushes.LightBlue, 2), ContentBounds);
+        //        for (int i = 0; i < DrawItems.Count; i++)
+        //        {
+        //            var p = DrawItems[i];
+        //            p.Draw(dc);
+        //        }
+        //        dc.Pop();
+        //        dc.Pop();
+        //    }
+
+        //    var rtb = new RenderTargetBitmap((int)(ContentBounds.Width), (int)(ContentBounds.Height), 96, 96, PixelFormats.Pbgra32);
+        //    rtb.Render(dv);
+
+        //    ImageSource = rtb;
+        //}
+        //public void CreateBitmap(Rect DrawArea)
+        //{            
+        //    var dv = new DrawingVisual();
+        //    using (var dc = dv.RenderOpen())
+        //    {
+        //        dc.PushTransform(new TranslateTransform(-ContentBounds.BottomLeft.X, ContentBounds.BottomLeft.Y));
+        //        dc.PushTransform(new TranslateTransform(-DrawArea.X + ContentBounds.Left, -ContentBounds.Height - ContentBounds.Top + DrawArea.Top + DrawArea.Height));
+        //        dc.PushTransform(new ScaleTransform(1, -1));
+        //        dc.PushClip(new RectangleGeometry(DrawArea));
+        //        for (int i = 0; i < DrawItems.Count; i++)
+        //        {
+        //            var p = DrawItems[i];
+        //            if (DrawArea.IntersectsWith(p.GetBounds()))
+        //            {
+        //                p.Draw(dc);
+        //            }
+        //        }
+        //        dc.Pop();
+        //        dc.Pop();
+        //        dc.Pop();
+        //        dc.Pop();
+        //    }
+        //    var rtb = new RenderTargetBitmap((int)(DrawArea.Width), (int)(DrawArea.Height), 96, 96, PixelFormats.Pbgra32);
+        //    rtb.Render(dv);
+
+        //    // 描画エリアは指定エリアに変更しておく
+        //    _contentBounds = DrawArea;
+
+        //    ImageSource = rtb;
+        //}
+
+        /// <summary>
+        /// 描画エリアの生成
+        /// </summary>
+        public void CreareContentBounds()
+        {
+            _contentBounds = Rect.Empty;
+            foreach (var item in DrawItems)
+            {
+                _contentBounds.Union(item.GetBounds()); // 各要素のバウンディングを統合                
+            }
+            // 5％ずつ余白を設ける
+            _contentBounds.Inflate(_contentBounds.Width * 0.05, _contentBounds.Height * 0.05);
+        }
+
+        /// <summary>
+        /// 指定領域に収まるアイテム座標の取得
+        /// </summary>
+        /// <param name="area"></param>
+        /// <returns></returns>
+        public List<Point> GetPointsInRegion(double radius)
+        {
+            List<Point> list = new List<Point>();
+            //foreach (var item in SelectItems)
+            //{
+            //    List<Point> buf = item.GeneratePoints(radius);
+            //    if (buf != null)
+            //    {
+            //        Point offset = ContentBounds.BottomLeft;
+            //        foreach (var pos in buf)
+            //        {
+            //            pos.Offset(-offset.X, offset.Y);
+            //            list.Add(new Point { X = pos.X, Y = pos.Y });
+            //        }
+            //    }
+            //}
+            return list;
+        }
+        public List<Point> GetPointsInRegion(DispenseCondition condition)
+        {
+            List<Point> list = new List<Point>();
+            foreach (var item in SelectItems)
+            {
+                List<Point> buf = item.GeneratePoints(condition);
+                if (buf != null)
+                {
+                    Point offset = ContentBounds.BottomLeft;
+                    foreach (var pos in buf)
+                    {
+                        pos.Offset(-offset.X, offset.Y);
+                        list.Add(new Point { X = pos.X, Y = pos.Y });
+                    }
+                }
+            }
+            return list;
+        }
+
+        public void SetSelectItems(Rect area)
+        {
+            SelectItems = new List<IDrawItem>();
+            foreach (var item in DrawItems)
+            {
+                if (item is DrawLine || item is DrawArcLine)
+                {
+                    continue;
+                }
+
+                Rect rect = item.GetBounds();
+                if (rect.IntersectsWith(area))
+                {
+                    SelectItems.Add(item);
+                }
+            }
+        }
+    }
+
+    public class VisualHostGerver : FrameworkElement
+    {
+        private Visual _child;
+
+        public void SetVisual(Visual visual)
+        {
+            if (_child != null)
+            {
+                RemoveVisualChild(_child);
+                RemoveLogicalChild(_child);
+            }
+
+            _child = visual;
+
+            if (_child != null)
+            {
+                AddVisualChild(_child);
+                AddLogicalChild(_child);
+            }
+        }
+
+        protected override int VisualChildrenCount => _child == null ? 0 : 1;
+
+        protected override Visual GetVisualChild(int index)
+        {
+            if (_child == null || index != 0)
+                throw new ArgumentOutOfRangeException();
+
+            return _child;
+        }
+    }
+}

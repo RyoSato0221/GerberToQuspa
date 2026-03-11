@@ -1,0 +1,64 @@
+﻿<UserControl x:Class="GerberToQuspa.View.OperationOrderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:GerberToQuspa"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="600">
+    <Grid>
+        <TreeView x:Name="tv" ItemsSource="{Binding RenderContext.ClusterList}" AllowDrop="True" Margin="5,10"
+                  local:TreeViewSelectedItemBehavior.SelectedItem="{Binding RenderContext.SelectedCluster, Mode=TwoWay}" 
+                  PreviewMouseLeftButtonDown="TreeView_PreviewMouseLeftButtonDown" 
+                  PreviewMouseRightButtonDown="TreeView_PreviewMouseRightButtonDown"
+                  Drop="TreeView_Drop" 
+                  MouseDoubleClick="TreeView_MouseDoubleClick">
+            <TreeView.Resources>
+                <!-- 第一階層（Cluster） -->
+                <HierarchicalDataTemplate DataType="{x:Type local:Cluster}" ItemsSource="{Binding PointList}">
+                    <StackPanel Orientation="Horizontal">
+                        <Rectangle Width="20" Height="20" Stroke="Black" Fill="{Binding ViewColor, Converter={StaticResource ClusterToBrushConverter}}"/>
+                        <!-- 表示用 -->
+                        <TextBlock x:Name="TextName" Text="{Binding Name}" Margin="8,0,0,0" />
+                        <!-- 編集用 -->
+                        <TextBox x:Name="EditName" Style="{StaticResource CustomTextBoxStyle}" Width="150" IsReadOnly="False" Padding="1,1,12,1" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                     Margin="8,0,0,0" Visibility="Collapsed" LostFocus="EditName_LostFocus"/>
+
+                        <StackPanel.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="順序反転" Command="{Binding ReverseCommand}" >
+                                    <MenuItem.Icon>
+                                        <TextBlock Style="{StaticResource IconStandard}" Text="&#xf71a;" Foreground="Black"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </StackPanel.ContextMenu>
+                    </StackPanel>
+
+                    <HierarchicalDataTemplate.Triggers>
+                        <!-- 編集モード ON なら TextBox 表示 -->
+                        <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                            <Setter TargetName="TextName" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="EditName" Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                        <!-- 編集モード OFF なら TextBlock 表示 -->
+                        <DataTrigger Binding="{Binding IsEditing}" Value="False">
+                            <Setter TargetName="TextName" Property="Visibility" Value="Visible" />
+                            <Setter TargetName="EditName" Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </HierarchicalDataTemplate.Triggers>
+
+                </HierarchicalDataTemplate>
+                <!-- 第二階層（Point） -->
+                <DataTemplate DataType="{x:Type local:PointVM}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="X:" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                        <TextBox Text="{Binding DisplayX, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat=F4}" Style="{StaticResource CustomTextBoxStyle}" Margin="4" Width="100" IsReadOnly="False" Padding="1,1,12,1"/>
+                        <TextBlock Text=", Y:" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                        <TextBox Text="{Binding DisplayY, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat=F4}" Style="{StaticResource CustomTextBoxStyle}" Margin="4" Width="100" IsReadOnly="False" Padding="1,1,12,1"/>
+                    </StackPanel>
+                </DataTemplate>
+            </TreeView.Resources>
+        </TreeView>
+    </Grid>
+</UserControl>
