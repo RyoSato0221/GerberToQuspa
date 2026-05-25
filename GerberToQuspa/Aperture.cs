@@ -67,7 +67,8 @@ namespace GerberToQuspa
         public double GetWidth()
         {
             //return 1000;
-            return (Diameter >= 1) ? Diameter * 2 : 1;
+            double w = (Diameter >= 1) ? Diameter * 2 : 1;
+            return (w < 25)? 25 : w;
         }
 
         public Geometry CreateGeometry(Point pos, bool isLPD)
@@ -318,7 +319,7 @@ namespace GerberToQuspa
         {
             for (int i = 0; i < param.Count(); i++)
             {
-                _macroVariables.Add(i + 1, (double)param[i] * ct.UnitScale);
+                _macroVariables.Add(i + 1, (double)param[i]);
             }
             Macro.ToInternalValue(_macroVariables, ct);
         }
@@ -366,7 +367,7 @@ namespace GerberToQuspa
     public class ApertureRS : IAperture
     {
         public string key { get; set; }
-        public List<PolygonPoint> points = new List<PolygonPoint>();
+        public IReadOnlyList<PolygonPoint> Points { get; set; }
 
         public void SetParameter(List<decimal> param, CoordinateTransformer transformer)
         {
@@ -388,9 +389,9 @@ namespace GerberToQuspa
             using (StreamGeometryContext ctx = geo.Open())
             {
                 Point currentPos = new Point();
-                for (int index = 0; index < points.Count(); index++)
+                for (int index = 0; index < Points.Count(); index++)
                 {
-                    PolygonPoint item = points[index];
+                    PolygonPoint item = Points[index];
                     if (index == 0)
                     {
                         Point startPos = new Point(item.PointX + offset.X, item.PointY + offset.Y);

@@ -485,7 +485,7 @@ namespace GerberToQuspa
             // ファイル選択
             OpenFileDialog openFileDialog = new OpenFileDialog()
             {
-                Filter = "Garber Files (*.gbr;*.gdo;*.GTP)|*.gdo;*.gbr;*.GTP",
+                Filter = "",
                 FilterIndex = 1,
             };
 
@@ -500,21 +500,34 @@ namespace GerberToQuspa
 
                 progressHelper.SetText("マップを生成しています...");
                 await Task.Delay(50);
-                await Application.Current.Dispatcher.InvokeAsync(() => _gerberRenderLayer.SetVisual(GerberData.CreateGerberVisual()));
+
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    _gerberRenderLayer.SetVisual(GerberData.CreateGerberVisual());
+                });
+
+                // 実描画待ち
+                await WaitRenderCompleteAsync();
                 UpDateViewOrigin();
 
                 // アパーチャリストの更新
                 ApertureList.Clear();
+
+                // 先頭固定
                 ApertureList.Add(new ApertureDropDownItem());
-                foreach (IAperture item in GerberDataControl.GetApertures())
-                {
-                    ApertureDropDownItem listItem = new ApertureDropDownItem()
+                var sorted = GerberDataControl.GetApertures()
+                    .Select(x => new ApertureDropDownItem()
                     {
-                        key = item.key,
-                        Code = item.CreatShowKey(),
-                    };
-                    ApertureList.Add(listItem);
-                }
+                        key = x.key,
+                        Code = x.CreatShowKey(),
+                    })
+                    .OrderBy(x => x.key);
+
+                foreach (var item in sorted)
+                {
+                    ApertureList.Add(item);
+                }                
+
                 SelectAperture = ApertureList[0];
 
                 // 完了時にウィンドウを閉じる
@@ -522,6 +535,22 @@ namespace GerberToQuspa
 
                 _padSelectionAdorner.GerberAnalysisData = GerberData;
             }
+        }
+        private Task WaitRenderCompleteAsync()
+        {
+            var tcs = new TaskCompletionSource<bool>();
+
+            EventHandler handler = null;
+
+            handler = (s, e) =>
+            {
+                CompositionTarget.Rendering -= handler;
+                tcs.SetResult(true);
+            };
+
+            CompositionTarget.Rendering += handler;
+
+            return tcs.Task;
         }
 
         /// <summary>
@@ -602,7 +631,7 @@ namespace GerberToQuspa
             // ファイル選択
             OpenFileDialog openFileDialog = new OpenFileDialog()
             {
-                Filter = "WhileData Files (*.csv)|*.gtq",
+                Filter = "WhileData Files (*.csv;*.gtq)|*.csv;*.gtq",
                 FilterIndex = 1,
             };
             if (openFileDialog.ShowDialog() == false)
@@ -624,6 +653,7 @@ namespace GerberToQuspa
                 while ((line = reader.ReadLine()) != null)
                 {
                     string[] splitString = Regex.Split(line, ",");
+                    splitString = splitString.Where(s => s != "").ToArray();
                     if (isFirst)
                     {
                         int indx = Array.IndexOf(splitString, "OrizinX");
@@ -641,10 +671,10 @@ namespace GerberToQuspa
                     else
                     {
                         PointVM data = new PointVM(
-                                double.Parse(splitString[1]) / 1000,
-                                double.Parse(splitString[2]) / 1000,
+                                double.Parse(splitString[1]) / 10000,
+                                double.Parse(splitString[2]) / 10000,
                                 RenderContext.TransformContext,
-                                (splitString.Count() == 7) ? int.Parse(splitString[6]) : 100);
+                                (splitString.Count() == 7) ? int.Parse(splitString[6]) : 200);
 
                         if (currentCluster == null)
                         {
@@ -670,10 +700,10 @@ namespace GerberToQuspa
                         }
 
                         currentCluster.PointList.Add(new PointVM(
-                            double.Parse(splitString[1]) / 1000,
-                            double.Parse(splitString[2]) / 1000,
+                            double.Parse(splitString[1]) / 10000,
+                            double.Parse(splitString[2]) / 10000,
                             RenderContext.TransformContext,
-                            (splitString.Count() == 7) ? int.Parse(splitString[6]) : 100)
+                            (splitString.Count() == 7) ? int.Parse(splitString[6]) : 200)
                             );
                     }
                 }
@@ -741,12 +771,12 @@ namespace GerberToQuspa
 
         private string CreateCsvLine(PointVM item, Cluster cluster)
         {
-            return $"0,{(int)(item.X * 1000)},{(int)(item.Y * 1000)},0,0";
+            return $"0,{(int)(item.X * 10000)},{(int)(item.Y * 10000)},0,0";
         }
 
         private string CreateTxtLine(PointVM item, Cluster cluster)
         {
-            return $"0,{(int)(item.X * 1000)},{(int)(item.Y * 1000)},0,0,{cluster.Name},{item.Size}";
+            return $"0,{(int)(item.X * 10000)},{(int)(item.Y * 10000)},0,0,{cluster.Name},{item.Size}";
         }
 
         /// <summary>

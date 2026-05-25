@@ -172,94 +172,94 @@ namespace GerberToQuspa
     /// <summary>
     /// ガーバーデータ解析クラス
     /// </summary>
-    class GerberDataControl
+    public class GerberFile
     {
-        public class GerberFile
+        public Dictionary<string, IAperture> Apertures { get; } = new Dictionary<string, IAperture>();
+        public List<Macro> Macros { get; } = new List<Macro>();
+    }
+
+    public class ProgressUnit
+    {
+        public StreamReader _reader;
+        public IProgress<ProgressReportMessage> Progress;
+        private ProgressReportMessage reportMessage;
+        private StringBuilder _buffer = new StringBuilder();
+        private long _totalLength;     // ファイル全体サイズ
+        private long _readLength;      // 現在の読み込み量
+
+        public event Action<double> ProgressChanged;
+
+        public ProgressUnit(FileStream fs, StreamReader reader, IProgress<ProgressReportMessage> progress)
         {
-            public Dictionary<string, IAperture> Apertures { get; } = new Dictionary<string, IAperture>();
-            public List<Macro> Macros { get; } = new List<Macro>();
+            _totalLength = fs.Length;
+            _reader = reader;
+            Progress = progress;
+            reportMessage = new ProgressReportMessage();
+            reportMessage.Message = "ガーバーデータ解析中";
         }
 
-        public class ProgressUnit
+        public string ReadStatement()
         {
-            public StreamReader _reader;
-            public IProgress<ProgressReportMessage> Progress;
-            private ProgressReportMessage reportMessage;
-            private StringBuilder _buffer = new StringBuilder();
-            private long _totalLength;     // ファイル全体サイズ
-            private long _readLength;      // 現在の読み込み量
+            _buffer.Clear();
 
-            public event Action<double> ProgressChanged;
+            int firstChar = -1;
 
-            public ProgressUnit(FileStream fs, StreamReader reader, IProgress<ProgressReportMessage> progress)
+            while (true)
             {
-                _totalLength = fs.Length;                
-                _reader = reader;
-                Progress = progress;
-                reportMessage = new ProgressReportMessage();
-                reportMessage.Message = "ガーバーデータ解析中";
-            }
+                int ch = _reader.Read();
 
-            public string ReadStatement()
-            {
-                _buffer.Clear();
-
-                int firstChar = -1;
-
-                while (true)
+                if (ch == -1) // EOF
                 {
-                    int ch = _reader.Read();
+                    if (_buffer.Length == 0)
+                        return null;
 
-                    if (ch == -1) // EOF
+                    return _buffer.ToString().Trim();
+                }
+
+                _readLength++;   // ← ここでカウント
+
+                // 進捗報告
+                if (_readLength % 100 == 0)
+                {
+                    reportMessage.Percent = (double)_readLength / _totalLength * 100.0;
+                    Progress.Report(reportMessage);
+                }
+
+                char c = (char)ch;
+
+                if (c == '\r' || c == '\n')
+                    continue;
+
+                if (firstChar == -1)
+                    firstChar = c;
+
+                _buffer.Append(c);
+
+                if (firstChar != '%')
+                {
+                    if (c == '*')
                     {
-                        if (_buffer.Length == 0)
-                            return null;
-
+                        _buffer.Length--;
                         return _buffer.ToString().Trim();
                     }
-
-                    _readLength++;   // ← ここでカウント
-
-                    // 進捗報告
-                    if (_readLength % 100 == 0)
+                }
+                else
+                {
+                    int len = _buffer.Length;
+                    if (len >= 2 &&
+                        _buffer[len - 2] == '*' &&
+                        _buffer[len - 1] == '%')
                     {
-                        reportMessage.Percent = (double)_readLength / _totalLength * 100.0;
-                        Progress.Report(reportMessage);
-                    }
-
-                    char c = (char)ch;
-
-                    if (c == '\r' || c == '\n')
-                        continue;
-
-                    if (firstChar == -1)
-                        firstChar = c;
-
-                    _buffer.Append(c);
-
-                    if (firstChar != '%')
-                    {
-                        if (c == '*')
-                        {
-                            _buffer.Length--;
-                            return _buffer.ToString().Trim();
-                        }
-                    }
-                    else
-                    {
-                        int len = _buffer.Length;
-                        if (len >= 2 &&
-                            _buffer[len - 2] == '*' &&
-                            _buffer[len - 1] == '%')
-                        {
-                            _buffer.Length -= 2;
-                            return _buffer.ToString().Trim();
-                        }
+                        _buffer.Length -= 2;
+                        return _buffer.ToString().Trim();
                     }
                 }
-            }            
+            }
         }
+    }
 
+    public class GerberDataControl
+    {
         private GerberFile file = new GerberFile();
         private int currentDCode;
         private CoordinateTransformer CoordinateTransformer = new CoordinateTransformer();
@@ -338,14 +338,22 @@ namespace GerberToQuspa
                     if (line.StartsWith("D") || line.StartsWith("G54"))
                     {
                         var dMatch = Regex.Match(line, @"D(\d+)");
-                        currentDCode = int.Parse(dMatch.Groups[1].Value);
-                        continue;
+                        int code = int.Parse(dMatch.Groups[1].Value);
+                        if(code >= 10)
+                        {
+                            currentDCode = code;
+                            continue;
+                        }                        
                     }
 
                     // リージョンステートメント
                     if (line.StartsWith("G36"))
                     {
-                        ParseRegionStatement(ref currentPosX, ref currentPosY, ref AnalysisData, unit);
+                        GerberRegionParser parser = new GerberRegionParser(file, CoordinateTransformer);
+                        foreach(var item in parser.Parse(unit, ref currentPosX, ref currentPosY))
+                        {
+                            AnalysisData.DrawItems.Add(item);
+                        }
                         continue;
                     }
 
@@ -388,7 +396,7 @@ namespace GerberToQuspa
                         {
                             IAperture aperture;
                             if (file.Apertures.TryGetValue($"D:{currentDCode}", out aperture))
-                            {
+                            {                               
                             }
                             else
                             {
@@ -473,6 +481,8 @@ namespace GerberToQuspa
         /// <returns></returns>
         private Macro ParseApertureMacro(string item)
         {
+            Dictionary<int, IExpression> variables = new Dictionary<int, IExpression>();
+
             // マクロを分割
             string[] parts = item.Split('*');
 
@@ -522,12 +532,26 @@ namespace GerberToQuspa
                 }
                 else if(part.StartsWith("$"))           // 逐次変数評価
                 {
+                    var tokens = Tokenizer.Tokenize(part);
+                    string s = tokens[0].Value;
+                    s = s.Replace("$", "");
+                    VariableExpression a = new VariableExpression(int.Parse(s));
 
+                    tokens.RemoveAt(0);
+
+                    var parser = new Parser(tokens);
+
+                    IExpression b = parser.ParseExpression(CoordinateTransformer);
+                    b.ExecuteAssignments(variables);
+
+                    variables[a.Index] = b;
+                    //EvaluateVariable(part, variables);
+                    continue;
                 }
 
                 if (primitive != null)
                 {
-                    primitive.SetParameter(buf, CoordinateTransformer);
+                    primitive.SetParameter(buf, CoordinateTransformer, variables);
                     macro.Primitives.Add(primitive);
                 }
 
@@ -565,124 +589,95 @@ namespace GerberToQuspa
             return macro;
         }
 
-        /// <summary>
-        /// リージョンステートメントの解析
-        /// </summary>        
-        /// <param name="parts"></param>
-        /// <param name="index"></param>
-        private void ParseRegionStatement(ref long currentPosX, ref long currentPosY, ref GerberAnalysisData data, ProgressUnit unit)
+        private void EvaluateVariable(string expression, Dictionary<int, IExpression> variables)
         {
-            InterpMode mode = InterpMode.Linear;
-            string str;
-            List<PolygonPoint> points = new List<PolygonPoint>();
-            do
+
+
+
+            // $3=$1X2
+
+            //string[] parts = expression.Split('=');
+
+            //if (parts.Length != 2)
+            //    return;
+
+            //// 左辺
+            //string left = parts[0].Trim();
+
+            //// 右辺
+            //string right = parts[1].Trim();
+
+            //// $3 → 3
+            //int variableNo =             int.Parse(left.Replace("$", ""));
+
+            //// 式評価
+            ////IExpression value = EvaluateExpression(right, variables);
+
+            //// 保存
+            //variables[variableNo] = value;
+        }
+
+        //private IExpression EvaluateExpression(string expression, Dictionary<int, IExpression> variables)
+        //{
+        //    // $1 → 値置換
+        //    foreach (var pair in variables)
+        //    {
+        //        expression =
+        //            expression.Replace($"${pair.Key}", pair.Value.ToString(CultureInfo.InvariantCulture));
+        //    }
+
+        //    // GerberのX → *
+        //    expression = expression.Replace("X", "*");
+
+        //    DataTable dt = new DataTable();
+
+        //    object result = dt.Compute(expression, "");
+
+        //    return Convert.ToDouble(result);
+        //}
+        
+        /// <summary>
+        /// 座標共通処理
+        /// </summary>
+        /// <param name="str"></param>
+        /// <param name="axis"></param>
+        /// <param name="defaultValue"></param>
+        /// <param name="converter"></param>
+        /// <returns></returns>
+        private long ParseCoordinate(string str, string axis, long defaultValue, Func<string, long> converter)
+        {
+            var match = Regex.Match(str, axis + @"(-?\d+)");
+
+            if (!match.Success)
             {
-                str = unit.ReadStatement();
-                if (str == null || str.StartsWith("G37"))
-                {
-                    break;
-                }
-                if (str.Contains("G01") || str.Contains("G1")) mode = InterpMode.Linear;
-                if (str.Contains("G02") || str.Contains("G2")) mode = InterpMode.CWArc;
-                if (str.Contains("G03") || str.Contains("G3")) mode = InterpMode.CCWArc;
+                return defaultValue;
+            }
+            return converter(match.Groups[1].Value);
+        }
 
-                var xMatch = Regex.Match(str, @"X(-?\d+)");
-                var yMatch = Regex.Match(str, @"Y(-?\d+)");
-                var iMatch = Regex.Match(str, @"I(-?\d+)");
-                var jMatch = Regex.Match(str, @"J(-?\d+)");
-
-                long x = xMatch.Success ? CoordinateTransformer.ToInternalX(xMatch.Groups[1].Value) : currentPosX;
-                long y = yMatch.Success ? CoordinateTransformer.ToInternalY(yMatch.Groups[1].Value) : currentPosY;
-                long i = iMatch.Success ? CoordinateTransformer.ToInternalX(iMatch.Groups[1].Value) : 0;
-                long j = jMatch.Success ? CoordinateTransformer.ToInternalY(jMatch.Groups[1].Value) : 0;
-
-                // 座標抽出                                    
-                if (str.StartsWith("X") || str.StartsWith("Y") || str.StartsWith("G01") || str.StartsWith("G02") || str.StartsWith("G03") || str.StartsWith("G1") || str.StartsWith("G2") || str.StartsWith("G3"))
-                {
-                    PolygonPoint item = new PolygonPoint
-                    {
-                        mode = mode,
-                        PointX = x,
-                        PointY = y,
-                        centerOffsetX = i,
-                        centerOffsetY = j,
-                    };
-                    points.Add(item);
-                }
-                currentPosX = x;
-                currentPosY = y;
-            } while (true);
-
-            // 中心（重心）
-            long minX = points.Min(p => p.PointX);
-            long maxX = points.Max(p => p.PointX);
-            long minY = points.Min(p => p.PointY);
-            long maxY = points.Max(p => p.PointY);
-
-            long sumX = minX + maxX;
-            long cx = (sumX >= 0) ? (sumX + 1) / 2 : (sumX - 1) / 2;
-            long sumY = minY + maxY;
-            long cy = (sumY >= 0) ? (sumY + 1) / 2 : (sumY - 1) / 2;
-
-            // 全点を移動
-            for (int i = 0; i < points.Count; i++)
+        private static bool IsCounterClockwise(List<PolygonPoint> pts)
+        {
+            float sum = 0;
+            for (int i = 0; i < pts.Count; i++)
             {
-                points[i].PointX -= cx;
-                points[i].PointY -= cy;
+                var p1 = pts[i];
+                var p2 = pts[(i + 1) % pts.Count];
+                sum += (p2.PointX - p1.PointX) * (p2.PointY + p1.PointY);
             }
+            return sum < 0;
+        }
 
-            // keyの作成
-            string key = "";
-            if(points.Count < 2)
-            {                
-                return; // 無効なケース
-            }
-            else if (points.Count == 2)
+        private static int GetStartIndex(List<PolygonPoint> points)
+        {
+            int index = 0;
+            for (int i = 1; i < points.Count; i++)
             {
-                if(IsFullCircle(points[1], points[0]))
+                if (points[i].PointX < points[index].PointX || (points[i].PointX == points[index].PointX && points[i].PointY < points[index].PointY))
                 {
-                    double radius = Math.Sqrt(points[1].centerOffsetX * points[1].centerOffsetX + points[1].centerOffsetY * points[1].centerOffsetY);
-                    var sb = new StringBuilder("RSC_");
-                    sb.Append($"R:{radius / 1000:F2}:");
-                    key = sb.ToString();
-                }
-                else
-                {
-                    return; // 無効なケース
+                    index = i;
                 }
             }
-            else
-            {
-                // key用に面積を算出
-                decimal area = 0;
-                for (int i = 0; i < points.Count; i++)
-                {
-                    var p1 = points[i];
-                    var p2 = points[(i + 1) % points.Count];
-                    area += p1.PointX * p2.PointY - p2.PointX * p1.PointY;
-                }
-                decimal area_mm2 = Math.Abs(area) / 2 / 1000 / 1000;
-
-                // key生成
-                decimal ax = (decimal)(maxX - minX) / 1000;
-                decimal ay = (decimal)(maxY - minY) / 1000;
-                var sb = new StringBuilder("RS_");
-                sb.Append($"X:{ax:F3}:");
-                sb.Append($"Y:{ay:F3}:");
-                sb.Append($"Area:{area_mm2:F2}:");
-                key = sb.ToString();
-            }
-
-            IAperture aperture;
-            if (!file.Apertures.TryGetValue(key, out aperture))
-            {
-                // 新規アパーチャとして保存しておく
-                aperture = new ApertureRS();
-                aperture.key = key;
-                ((ApertureRS)aperture).points = points;
-                file.Apertures.Add(key, aperture);
-            }
-            data.DrawItems.Add(new DrawPad(aperture, new Point(cx, cy), true));
+            return index;
         }
 
         /// <summary>
@@ -740,30 +735,7 @@ namespace GerberToQuspa
             var dv = new DrawingVisual();
 
             using (var dc = dv.RenderOpen())
-            {
-                //var sg = new StreamGeometry();
-
-                //dc.PushTransform(new TranslateTransform(-ContentBounds.BottomLeft.X, ContentBounds.BottomLeft.Y));
-                //dc.PushTransform(new ScaleTransform(1, -1));
-                //dc.PushGuidelineSet(new GuidelineSet());
-                //using (var ctx = sg.Open())
-                //{
-                //    foreach (var item in DrawItems)
-                //    {
-                //        item.Draw(ctx);
-                //    }
-                //}
-
-                //sg.Freeze();
-
-                //Pen pen = new Pen(Brushes.Green, 1);
-                //pen.Freeze();
-
-                //dc.DrawGeometry(null, pen, sg);   // ← 1回だけ
-                //dc.Pop();
-                //dc.Pop();
-                //dc.Pop();
-
+            {                
                 dc.PushTransform(new TranslateTransform(-ContentBounds.BottomLeft.X, ContentBounds.BottomLeft.Y));
                 dc.PushTransform(new ScaleTransform(1, -1));
 

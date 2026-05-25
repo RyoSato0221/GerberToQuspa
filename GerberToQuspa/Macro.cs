@@ -177,7 +177,7 @@ namespace GerberToQuspa
 
     public interface IPrimitive
     {
-        void SetParameter(List<string> parameters, CoordinateTransformer ct);
+        void SetParameter(List<string> parameters, CoordinateTransformer ct, Dictionary<int, IExpression> vars);
         void ToInternalValue(Dictionary<int, double> macroVariables, CoordinateTransformer ct);
         Geometry CreateGeometry(Point pos, bool isLPD);
         Rect GetBounds();
@@ -197,19 +197,19 @@ namespace GerberToQuspa
         private double X;
         private double Y;
 
-        public void SetParameter(List<string> parameters, CoordinateTransformer ct)
+        public void SetParameter(List<string> parameters, CoordinateTransformer ct, Dictionary<int, IExpression> vars)
         {
             Exposure = (parameters[1] == "1");
-            iDiameter = ExpressionFactory.Create(parameters[2], ct);
-            iX = ExpressionFactory.Create(parameters[3], ct);
-            iY = ExpressionFactory.Create(parameters[4], ct);
+            iDiameter = ExpressionFactory.Create(parameters[2], ct, vars);
+            iX = ExpressionFactory.Create(parameters[3], ct, vars);
+            iY = ExpressionFactory.Create(parameters[4], ct, vars);
         }
 
         public void ToInternalValue(Dictionary<int, double> macroVariables, CoordinateTransformer ct)
-        {
-            Diameter = iDiameter.Evaluate(macroVariables) / 2;
-            X = iX.Evaluate(macroVariables);
-            Y = iY.Evaluate(macroVariables);
+        {            
+            Diameter = iDiameter.Evaluate(macroVariables) / 2 * ct.UnitScale;
+            X = iX.Evaluate(macroVariables) * ct.UnitScale;
+            Y = iY.Evaluate(macroVariables) * ct.UnitScale;            
         }
 
         public Geometry CreateGeometry(Point pos, bool isLPD)
@@ -244,7 +244,7 @@ namespace GerberToQuspa
     {
         public List<string> Params { get; set; } = new List<string>();
 
-        public void SetParameter(List<string> parameters, CoordinateTransformer transformer)
+        public void SetParameter(List<string> parameters, CoordinateTransformer transformer, Dictionary<int, IExpression> vars)
         {
         }
 
@@ -287,25 +287,25 @@ namespace GerberToQuspa
         private double Y2;
         private double Rotation;
 
-        public void SetParameter(List<string> parameters, CoordinateTransformer ct)
+        public void SetParameter(List<string> parameters, CoordinateTransformer ct, Dictionary<int, IExpression> vars)
         {
             Exposure = (parameters[1] == "1");
-            iWidth = ExpressionFactory.Create(parameters[2], ct);
-            iX1 = ExpressionFactory.Create(parameters[3], ct);
-            iY1 = ExpressionFactory.Create(parameters[4], ct);
-            iX2 = ExpressionFactory.Create(parameters[5], ct);
-            iY2 = ExpressionFactory.Create(parameters[6], ct);
-            iRotation = ExpressionFactory.Create(parameters[7], ct);
+            iWidth = ExpressionFactory.Create(parameters[2], ct, vars);
+            iX1 = ExpressionFactory.Create(parameters[3], ct, vars);
+            iY1 = ExpressionFactory.Create(parameters[4], ct, vars);
+            iX2 = ExpressionFactory.Create(parameters[5], ct, vars);
+            iY2 = ExpressionFactory.Create(parameters[6], ct, vars);
+            iRotation = ExpressionFactory.Create(parameters[7], ct, vars);
         }
 
         public void ToInternalValue(Dictionary<int, double> macroVariables, CoordinateTransformer ct)
         {
-            Width = iWidth.Evaluate(macroVariables);
-            X1 = iX1.Evaluate(macroVariables);
-            Y1 = iY1.Evaluate(macroVariables);
-            X2 = iX2.Evaluate(macroVariables);
-            Y2 = iY2.Evaluate(macroVariables);
-            Rotation = iRotation.Evaluate(macroVariables) / ct.UnitScale;
+            Width = iWidth.Evaluate(macroVariables) * ct.UnitScale;
+            X1 = iX1.Evaluate(macroVariables) * ct.UnitScale;
+            Y1 = iY1.Evaluate(macroVariables) * ct.UnitScale;
+            X2 = iX2.Evaluate(macroVariables) * ct.UnitScale;
+            Y2 = iY2.Evaluate(macroVariables) * ct.UnitScale;
+            Rotation = iRotation.Evaluate(macroVariables);
         }
 
         public Geometry CreateGeometry(Point pos, bool isLPD)
@@ -383,23 +383,23 @@ namespace GerberToQuspa
         private double Y;
         private double Rotation;
 
-        public void SetParameter(List<string> parameters, CoordinateTransformer ct)
+        public void SetParameter(List<string> parameters, CoordinateTransformer ct, Dictionary<int, IExpression> vars)
         {
             Exposure = (parameters[1] == "1");
-            iWidth = ExpressionFactory.Create(parameters[2], ct);
-            iHeight = ExpressionFactory.Create(parameters[3], ct);
-            iX = ExpressionFactory.Create(parameters[4], ct);
-            iY = ExpressionFactory.Create(parameters[5], ct);
-            iRotation = ExpressionFactory.Create(parameters[6], ct);
+            iWidth = ExpressionFactory.Create(parameters[2], ct, vars);
+            iHeight = ExpressionFactory.Create(parameters[3], ct, vars);
+            iX = ExpressionFactory.Create(parameters[4], ct, vars);
+            iY = ExpressionFactory.Create(parameters[5], ct, vars);
+            iRotation = ExpressionFactory.Create(parameters[6], ct, vars);
         }
 
         public void ToInternalValue(Dictionary<int, double> macroVariables, CoordinateTransformer ct)
         {
-            Width = iWidth.Evaluate(macroVariables);
-            Height = iHeight.Evaluate(macroVariables);
-            X = iX.Evaluate(macroVariables);
-            Y = iY.Evaluate(macroVariables);
-            Rotation = iRotation.Evaluate(macroVariables) / ct.UnitScale;
+            Width = iWidth.Evaluate(macroVariables) * ct.UnitScale;
+            Height = iHeight.Evaluate(macroVariables) * ct.UnitScale;
+            X = iX.Evaluate(macroVariables) * ct.UnitScale;
+            Y = iY.Evaluate(macroVariables) * ct.UnitScale;
+            Rotation = iRotation.Evaluate(macroVariables);
         }
 
         public Geometry CreateGeometry(Point pos, bool isLPD)
@@ -448,24 +448,24 @@ namespace GerberToQuspa
         private int VertexCount;
         private double Rotation;
 
-        public void SetParameter(List<string> parameters, CoordinateTransformer ct)
+        public void SetParameter(List<string> parameters, CoordinateTransformer ct, Dictionary<int, IExpression> vars)
         {
             Exposure = (parameters[1] == "1");
-            iVertexCount = ExpressionFactory.Create(parameters[2], ct);
+            iVertexCount = ExpressionFactory.Create(parameters[2], ct, vars);
             for (int i = 3; i < parameters.Count() - 1; i++)
             {
-                iPoints.Add(ExpressionFactory.Create(parameters[i], ct));
+                iPoints.Add(ExpressionFactory.Create(parameters[i], ct, vars));
             }
-            iRotation = ExpressionFactory.Create(parameters[parameters.Count() - 1], ct);
+            iRotation = ExpressionFactory.Create(parameters[parameters.Count() - 1], ct, vars);
         }
 
         public void ToInternalValue(Dictionary<int, double> macroVariables, CoordinateTransformer ct)
         {
             foreach (IExpression item in iPoints)
             {
-                Points.Add(item.Evaluate(macroVariables));
+                Points.Add(item.Evaluate(macroVariables) * ct.UnitScale);
             }
-            VertexCount = (int)(iVertexCount.Evaluate(macroVariables) / ct.UnitScale);
+            VertexCount = (int)(iVertexCount.Evaluate(macroVariables));
             Rotation = iRotation.Evaluate(macroVariables);
         }
 

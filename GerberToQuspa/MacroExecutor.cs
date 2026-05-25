@@ -15,6 +15,7 @@ namespace GerberToQuspa
     enum TokenType
     {
         Number,      // 数値 (例: 10, 3.5)
+        ConstNumber, // 数値 (*,/の後の数値)
         Variable,    // 変数 (例: $1, $2)
         Operator,    // 演算子 (+ - * /)
         LeftParen,   // (
@@ -41,6 +42,7 @@ namespace GerberToQuspa
     {
         double Evaluate(Dictionary<int, double> vars);
         IExpression Clone();
+        IExpression ExecuteAssignments(Dictionary<int, IExpression> vars);
     }
 
     /// <summary>
@@ -50,7 +52,7 @@ namespace GerberToQuspa
     {
         private readonly double _value;
 
-        public ConstantExpression(long value)
+        public ConstantExpression(double value)
         {
             _value = value;
         }
@@ -64,6 +66,11 @@ namespace GerberToQuspa
         {
             return this;
         }
+
+        public IExpression ExecuteAssignments(Dictionary<int, IExpression> vars)
+        {
+            return this;
+        }
     }
 
     /// <summary>
@@ -72,6 +79,7 @@ namespace GerberToQuspa
     public class VariableExpression : IExpression
     {
         private readonly int _index;
+        public int Index => _index;
 
         public VariableExpression(int index)
         {
@@ -86,6 +94,18 @@ namespace GerberToQuspa
         public IExpression Clone()
         {
             return this;
+        }
+
+        public IExpression ExecuteAssignments(Dictionary<int, IExpression> vars)
+        {
+            if (vars.ContainsKey(Index))
+            {
+                return vars[Index];
+            }
+            else
+            {
+                return this;
+            }            
         }
     }
 
@@ -115,7 +135,10 @@ namespace GerberToQuspa
             {
                 case "+": return a + b;
                 case "-": return a - b;
-                case "*": return a * b;
+                case "*":
+                case "X":
+                case "x":
+                    return a * b;
                 case "/": return b != 0 ? a / b : 0;
             }
 
@@ -124,6 +147,13 @@ namespace GerberToQuspa
 
         public IExpression Clone()
         {
+            return this;
+        }
+
+        public IExpression ExecuteAssignments(Dictionary<int, IExpression> vars)
+        {
+            _left = _left.ExecuteAssignments(vars);
+            _right = _right.ExecuteAssignments(vars);
             return this;
         }
     }
@@ -143,6 +173,11 @@ namespace GerberToQuspa
         }
 
         public IExpression Clone()
+        {
+            return this;
+        }
+
+        public IExpression ExecuteAssignments(Dictionary<int, IExpression> vars)
         {
             return this;
         }
@@ -171,7 +206,7 @@ namespace GerberToQuspa
     class Tokenizer
     {
         // Gerber Macro の数式に対応したトークン抽出
-        static Regex regex = new Regex(@"\$\d+|-?\d+(\.\d+)?|[+\-*/()]");
+        static Regex regex = new Regex(@"\$\d+|-?\d+(\.\d+)?|[+\-*Xx/()]");
         
         public static List<Token> Tokenize(string expr)
         {
@@ -191,11 +226,22 @@ namespace GerberToQuspa
                 }
                 else if (char.IsDigit(v[0]) || (v.Length > 1 && v[0] == '-' && char.IsDigit(v[1])))
                 {
-                    tokens.Add(new Token
+                    if(tokens.Count() != 0)
                     {
-                        Type = TokenType.Number,
-                        Value = v
-                    });
+                        string last = tokens.Last()?.Value;
+                        if (last == "X" || last == "x" || last == "*" || last == "/")
+                        {
+                            tokens.Add(new Token { Type = TokenType.ConstNumber, Value = v });
+                        }
+                        else
+                        {
+                            tokens.Add(new Token { Type = TokenType.Number, Value = v });
+                        }
+                    }
+                    else
+                    {
+                        tokens.Add(new Token { Type = TokenType.Number, Value = v });
+                    }
                 }
                 else if (v == "(")
                 {
@@ -204,7 +250,7 @@ namespace GerberToQuspa
                 else if (v == ")")
                 {
                     tokens.Add(new Token { Type = TokenType.RightParen, Value = v });
-                }
+                }                
                 else
                 {
                     tokens.Add(new Token
@@ -213,6 +259,7 @@ namespace GerberToQuspa
                         Value = v
                     });
                 }
+
             }
 
             tokens.Add(new Token { Type = TokenType.End });
@@ -235,6 +282,8 @@ namespace GerberToQuspa
             { "+",1 },
             { "-",1 },
             { "*",2 },
+            { "X",2 },
+            { "x",2 },
             { "/",2 }
         };
 
@@ -285,9 +334,17 @@ namespace GerberToQuspa
 
             if (t.Type == TokenType.Number)
             {
-                decimal value = decimal.Parse(t.Value, CultureInfo.InvariantCulture);
-                long internalValue = ct.ParseRealToInternal(value);
-                return new ConstantExpression(internalValue);
+                double value = double.Parse(t.Value, CultureInfo.InvariantCulture);
+                return new ConstantExpression(value);
+                //decimal value = decimal.Parse(t.Value, CultureInfo.InvariantCulture);
+                //long internalValue = ct.ParseRealToInternal(value);
+                //return new ConstantExpression(internalValue);
+            }
+
+            if (t.Type == TokenType.ConstNumber)
+            {
+                double value = double.Parse(t.Value, CultureInfo.InvariantCulture);
+                return new ConstantExpression(value);
             }
 
             if (t.Type == TokenType.Variable)
@@ -318,13 +375,15 @@ namespace GerberToQuspa
 
     class ExpressionFactory
     {
-        public static IExpression Create(string expr, CoordinateTransformer ct)
+        public static IExpression Create(string expr, CoordinateTransformer ct, Dictionary<int, IExpression> vars)
         {
             var tokens = Tokenizer.Tokenize(expr);
 
             var parser = new Parser(tokens);
 
-            return parser.ParseExpression(ct);
+            IExpression ex = parser.ParseExpression(ct);
+            return ex.ExecuteAssignments(vars);
+//            return ex;
         }
     }
 

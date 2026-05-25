@@ -69,6 +69,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="GerberRegionParser.cs" />
     <Compile Include="MacroExecutor.cs" />
     <Compile Include="Cluster.cs" />
     <Compile Include="Converter.cs" />

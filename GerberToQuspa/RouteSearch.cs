@@ -528,25 +528,36 @@ namespace GerberToQuspa
             labels[pointIndex] = clusterId;
             Queue<int> queue = new Queue<int>(neighbors);
 
+            // ★ 追加：訪問済み管理
+            HashSet<int> visited = new HashSet<int>(neighbors);
+            visited.Add(pointIndex);
+
             while (queue.Count > 0)
             {
                 int current = queue.Dequeue();
 
+                // ノイズ→クラスタ昇格
                 if (labels[current] == -1)
-                    labels[current] = clusterId; // ノイズをクラスタに変換
+                    labels[current] = clusterId;
 
+                // すでにクラスタ済みならスキップ
                 if (labels[current] != 0)
-                    continue; // すでにクラスタ割り当て済み
+                    continue;
 
                 labels[current] = clusterId;
 
                 var currentNeighbors = RegionQuery(points, current);
+
                 if (currentNeighbors.Count >= MinPts)
                 {
                     foreach (var n in currentNeighbors)
                     {
-                        if (!queue.Contains(n))
+                        // ★ 修正：visitedで判定
+                        if (!visited.Contains(n))
+                        {
                             queue.Enqueue(n);
+                            visited.Add(n);
+                        }
                     }
                 }
             }
