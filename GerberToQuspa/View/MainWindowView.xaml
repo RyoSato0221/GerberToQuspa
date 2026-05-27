@@ -8,19 +8,15 @@
         xmlns:vm="clr-namespace:GerberToQuspa.ViewModel"
         xmlns:i="clr-namespace:System.Windows.Interactivity;assembly=System.Windows.Interactivity"
         mc:Ignorable="d"
-        Title="GerberToQuspa" Height="1000" Width="1600"
+        Title="GerberToQuspa" Height="768" Width="1024"
         WindowStartupLocation="CenterScreen"
         WindowState="Maximized"
         >
 
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width ="*"/>
-            <ColumnDefinition Width ="560"/>
-        </Grid.ColumnDefinitions>
-
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
+                <RowDefinition Height="50"/>
                 <RowDefinition Height="50"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="50"/>
@@ -35,75 +31,97 @@
                 </StackPanel>
             </Grid>
 
-
-            <Grid x:Name="mainGrid" Grid.Row="1" Background="Black" ClipToBounds="True" SizeChanged="MainGrid_SizeChanged" Cursor="{Binding CurrentCursor}">
-                <AdornerDecorator>
-                    <Canvas x:Name="gerberCanvas" ClipToBounds="False" RenderTransform="{Binding RenderContext.TransformContext.Transform}" HorizontalAlignment="Left" VerticalAlignment="Top">
-                        <local:GerberRenderLayer x:Name="gerberRenderLayer"/>
-                    </Canvas>
-                </AdornerDecorator>
-                <AdornerDecorator>
-                    <Canvas x:Name="dispenseCanvas" ClipToBounds="False" RenderTransform="{Binding RenderContext.TransformContext.Transform}" HorizontalAlignment="Left" VerticalAlignment="Top">
-                        <local:DispensePointLayer x:Name="dispensePointLayer"/>
-                    </Canvas>
-                </AdornerDecorator>
-            </Grid>
-
-            <Grid Grid.Row="2">
-                <StackPanel Orientation="Horizontal">
-                    <StackPanel Orientation="Horizontal" Margin="20,0">
-                        <TextBlock Text="現在座標 (X: " Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding CurrentMouseWorldPosX, FallbackValue=0.0000}" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                        <TextBlock Text=", Y: " Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding CurrentMouseWorldPosY, FallbackValue=0.0000}" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                        <TextBlock Text=")" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="10,0">
-                        <TextBlock Text="原点座標 (X: " Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                        <TextBox Style="{StaticResource CustomTextBoxStyle}" Width="110" Text="{Binding RenderContext.TransformContext.TeachingOffsetX, FallbackValue=0.0000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Padding="1,1,24,1"/>
-                        <TextBlock Text=", Y: " Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                        <TextBox Style="{StaticResource CustomTextBoxStyle}" Width="110" Text="{Binding RenderContext.TransformContext.TeachingOffsetY, FallbackValue=0.0000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Padding="1,1,24,1"/>
-                        <TextBlock Text=")" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                        <Button Style="{StaticResource StandardIconButton}" Tag="&#xe777;" Height="32" Width="32" Command="{Binding ResetOriginCommand}" ToolTip="原点座標リセット" Margin="4,0,0,0"/>
-                        <local:CustomToggleButton Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding OriginView}" OnText="原点表示" OffText="原点非表示" Margin="10"/>
-                    </StackPanel>
-                </StackPanel>
-            </Grid>
-        </Grid>
-
-        <Grid Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="60"/>
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0" Margin="16">
-                <TabControl Style="{StaticResource CustomTabStyle}" SelectedIndex="{Binding SelectedTabIndex}">
-                    <TabControl.ItemContainerStyle>
-                        <StaticResource ResourceKey="SimpleTabItemStyle"/>
-                    </TabControl.ItemContainerStyle>
-                    <TabItem Header="クラスタリングリスト">
-                        <view:OperationOrderView DataContext="{Binding OperationOrderVM}"/>
-                    </TabItem>
-                    <TabItem Header="設定">
-                        <view:ClusterSettingView DataContext="{Binding ClusterSettingViewModel}" />
-                    </TabItem>
-                    <TabItem Header="操作">
-                        <view:OperationView DataContext="{Binding OperationViewModel}" />
-                    </TabItem>
-                </TabControl>
-            </Grid>
             <Grid Margin="16,5" Grid.Row="1">
-                <StackPanel Orientation="Horizontal" >
-                    <Button Style="{StaticResource AccentIconButton}" Tag="&#xe9a6;" Command="{Binding ResetViewCommand}" ToolTip="Fit"/>
-                    <Button Style="{StaticResource AccentIconButton}" Tag="&#xe8e5;" Command="{Binding ReadGervarCommand}" ToolTip="ガーバーデータ読み込み"/>
-                    <Button Style="{StaticResource AccentIconButton}" Tag="&#xf5b0;" Command="{Binding CreateRouteCommand}" ToolTip="経路作成" IsEnabled="{Binding IsEnableCreateRoute}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Style="{StaticResource AccentIconButton}" Tag="&#xe896;" Command="{Binding WhileDataInPortCommand}" ToolTip="ファイル入力"/>
-                    <Button Style="{StaticResource AccentIconButton}" Tag="&#xe898;" Command="{Binding WhileDataExPortCommand}" ToolTip="ファイル出力" IsEnabled="{Binding IsEnableOutputFile}"/>
-                </StackPanel>
+                <ToolBarTray DockPanel.Dock="Top" IsLocked="True" Background="Transparent">
+                    <ToolBar>
+                        <Button Style="{StaticResource AccentIconButton}" Tag="&#xe9a6;" Command="{Binding ResetViewCommand}" ToolTip="Fit"/>
+                        <Button Style="{StaticResource AccentIconButton}" Tag="&#xe8e5;" Command="{Binding ReadGervarCommand}" ToolTip="ガーバーデータ読み込み" Margin="8,0"/>
+                        <Button Style="{StaticResource AccentIconButton}" Tag="&#xf5b0;" Command="{Binding CreateRouteCommand}" ToolTip="経路作成" IsEnabled="{Binding IsEnableCreateRoute}" Margin="8,0"/>
+                        <Button Style="{StaticResource AccentIconButton}" Tag="&#xe896;" Command="{Binding WhileDataInPortCommand}" ToolTip="ファイル入力" Margin="32,0,8,0"/>
+                        <Button Style="{StaticResource AccentIconButton}" Tag="&#xe898;" Command="{Binding WhileDataExPortCommand}" ToolTip="ファイル出力" IsEnabled="{Binding IsEnableOutputFile}" Margin="8,0"/>
+                    </ToolBar>
+                </ToolBarTray>
             </Grid>
+
+            <Grid  Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width ="*"/>
+                    <ColumnDefinition Width ="560"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0" x:Name="mainGrid" Background="Black" ClipToBounds="True" SizeChanged="MainGrid_SizeChanged" Cursor="{Binding CurrentCursor}">
+                    <AdornerDecorator>
+                        <Canvas x:Name="gerberCanvas" ClipToBounds="False" RenderTransform="{Binding RenderContext.TransformContext.Transform}" HorizontalAlignment="Left" VerticalAlignment="Top">
+                            <local:GerberRenderLayer x:Name="gerberRenderLayer"/>
+                        </Canvas>
+                    </AdornerDecorator>
+                    <AdornerDecorator>
+                        <Canvas x:Name="dispenseCanvas" ClipToBounds="False" RenderTransform="{Binding RenderContext.TransformContext.Transform}" HorizontalAlignment="Left" VerticalAlignment="Top">
+                            <local:DispensePointLayer x:Name="dispensePointLayer"/>
+                        </Canvas>
+                    </AdornerDecorator>
+                </Grid>
+
+                <Grid Grid.Column="1">
+                    <Grid Margin="16">
+                        <TabControl Style="{StaticResource CustomTabStyle}" SelectedIndex="{Binding SelectedTabIndex}">
+                            <TabControl.ItemContainerStyle>
+                                <StaticResource ResourceKey="SimpleTabItemStyle"/>
+                            </TabControl.ItemContainerStyle>
+                            <TabItem Header="クラスタリングリスト">
+                                <view:OperationOrderView DataContext="{Binding OperationOrderVM}"/>
+                            </TabItem>
+                            <TabItem Header="設定">
+                                <view:ClusterSettingView DataContext="{Binding ClusterSettingViewModel}" />
+                            </TabItem>
+                            <TabItem Header="操作">
+                                <view:OperationView DataContext="{Binding OperationViewModel}" />
+                            </TabItem>
+                        </TabControl>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <Grid Grid.Row="3">
+                <StatusBar DockPanel.Dock="Bottom" Background="Transparent" Margin="8,0">
+                    <StatusBarItem Margin="8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="X: " Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding CurrentMouseWorldPosX, FallbackValue=0.0000}" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StatusBarItem>
+                    <Separator/>
+                    <StatusBarItem Margin="8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Y: " Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding CurrentMouseWorldPosY, FallbackValue=0.0000}" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StatusBarItem>
+                    <Separator/>
+                    <StatusBarItem Margin="8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="OX: " Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Width="110" Text="{Binding RenderContext.TransformContext.TeachingOffsetX, FallbackValue=0.0000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Padding="1,1,24,1"/>
+                        </StackPanel>
+                    </StatusBarItem>
+                    <Separator/>
+                    <StatusBarItem Margin="8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="OY: " Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Width="110" Text="{Binding RenderContext.TransformContext.TeachingOffsetY, FallbackValue=0.0000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Padding="1,1,24,1"/>
+                        </StackPanel>
+                    </StatusBarItem>
+                    <Separator/>
+                    <StatusBarItem Margin="8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource StandardIconButton}" Tag="&#xe777;" Height="32" Width="32" Command="{Binding ResetOriginCommand}" ToolTip="原点座標リセット" Margin="4,0,0,0"/>
+                            <local:CustomToggleButton Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding OriginView}" OnText="原点表示" OffText="原点非表示" Margin="10"/>
+                        </StackPanel>
+                    </StatusBarItem>
+                </StatusBar>
+            </Grid>
+
+
         </Grid>
     </Grid>
 

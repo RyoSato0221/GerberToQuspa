@@ -307,6 +307,27 @@ namespace GerberToQuspa
 
             OnPropertyChanged(nameof(Transform));
         }
+
+        /// <summary>
+        /// Viewサイズの変更
+        /// </summary>
+        public void UpdataViewSize(double width, double height)
+        {
+            double scaleX = width / _originRect.Width;
+            double scaleY = height / _originRect.Height;            
+
+            // Reset 用に保存
+            _originViewWidth = width;
+            _originViewHeight = height;
+            _originScale = Math.Min(scaleX, scaleY);
+            _offsetX = OriginOffsetX;
+            _offsetY = OriginOffsetY;
+
+            _mirrorOffsetX = _originRect.Width * _originScale;
+            _mirrorOffsetY = _originRect.Height * _originScale;
+
+            UpdateTransform();
+        }
     }
 
     public class RenderContext : BindableBase

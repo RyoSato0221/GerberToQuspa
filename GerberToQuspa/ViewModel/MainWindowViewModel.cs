@@ -60,18 +60,8 @@ namespace GerberToQuspa
         /// <summary>
         /// 描画エリアのサイズ
         /// </summary>
-        private double _viewWidth;
-        public double ViewWidth
-        {
-            get { return _viewWidth; }
-            set { SetProperty(ref _viewWidth, value); }
-        }
-        private double _viewHeight;
-        public double ViewHeight
-        {
-            get { return _viewHeight; }
-            set { SetProperty(ref _viewHeight, value); }
-        }
+        public double ViewWidth { get; set; }
+        public double ViewHeight { get; set; }
 
         /// <summary>
         /// 現在座標
@@ -329,6 +319,14 @@ namespace GerberToQuspa
                     RenderContext.TransformContext.IsMirrorY = ClusterSettingViewModel.IsMirrorY;
                     break;
             }
+        }
+
+        /// <summary>
+        /// Viewサイズの変更
+        /// </summary>
+        public void UpdataViewSize()
+        {
+            RenderContext.TransformContext.UpdataViewSize(ViewWidth, ViewHeight);
         }
 
         /// <summary>

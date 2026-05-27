@@ -10,83 +10,85 @@
              >
 
     <Grid Background="White">
-        <StackPanel Orientation="Vertical" Margin="16">
-            <Border Style="{StaticResource CardBorder}">
-                <StackPanel Orientation="Vertical" Margin="0,5">
-                    <TextBlock Text="塗布条件選択/編集" Style="{StaticResource BodyLargeStrong}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-                    <StackPanel Orientation="Horizontal" Margin="16,16,0,0">
-                        <ComboBox SelectedItem="{Binding SelectedCondition}" Width="300" ItemsSource="{Binding Conditions}" Style="{StaticResource CustomDropDown}" HorizontalAlignment="Left" IsEnabled="{Binding IsEdit, Converter={StaticResource BooleanInvertConverter}}"/>
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsEdit, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                            <Button Style="{StaticResource IconButton}" Tag="&#xe710;" Command="{Binding AddCommand}" ToolTip="塗布条件の追加" Margin="8,0,0,0" />
-                            <Button Style="{StaticResource IconButton}" Tag="&#xe70f;" Command="{Binding EditCommand}" ToolTip="編集" Margin="8,0,0,0" />
+        <ScrollViewer HorizontalScrollBarVisibility="Auto">
+            <StackPanel Orientation="Vertical" Margin="16">
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel Orientation="Vertical" Margin="0,5">
+                        <TextBlock Text="塗布条件選択/編集" Style="{StaticResource BodyLargeStrong}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                        <StackPanel Orientation="Horizontal" Margin="16,16,0,0">
+                            <ComboBox SelectedItem="{Binding SelectedCondition}" Width="300" ItemsSource="{Binding Conditions}" Style="{StaticResource CustomDropDown}" HorizontalAlignment="Left" IsEnabled="{Binding IsEdit, Converter={StaticResource BooleanInvertConverter}}"/>
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsEdit, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                <Button Style="{StaticResource IconButton}" Tag="&#xe710;" Command="{Binding AddCommand}" ToolTip="塗布条件の追加" Margin="8,0,0,0" />
+                                <Button Style="{StaticResource IconButton}" Tag="&#xe70f;" Command="{Binding EditCommand}" ToolTip="編集" Margin="8,0,0,0" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsEdit, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Button Style="{StaticResource IconButton}" Tag="&#xe78c;" Command="{Binding SaveCommand}" ToolTip="保存" Margin="8,0,0,0"/>
+                                <Button Style="{StaticResource IconButton}" Tag="&#xe711;" Command="{Binding CancelCommand}" ToolTip="キャンセル" Margin="8,0,0,0"/>
+                            </StackPanel>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsEdit, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <Button Style="{StaticResource IconButton}" Tag="&#xe78c;" Command="{Binding SaveCommand}" ToolTip="保存" Margin="8,0,0,0"/>
-                            <Button Style="{StaticResource IconButton}" Tag="&#xe711;" Command="{Binding CancelCommand}" ToolTip="キャンセル" Margin="8,0,0,0"/>
+                        <StackPanel IsEnabled="{Binding IsEdit}"  Margin="16,16,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="コメント：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="80"/>
+                                <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding Name, FallbackValue=default, UpdateSourceTrigger=LostFocus}" Width="250" HorizontalAlignment="Left"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                <TextBlock Text="塗布径：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="80"/>
+                                <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding Size, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                                <TextBlock Text="mm" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
+                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
-                    <StackPanel IsEnabled="{Binding IsEdit}"  Margin="16,16,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="コメント：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="80"/>
-                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding Name, FallbackValue=default, UpdateSourceTrigger=LostFocus}" Width="250" HorizontalAlignment="Left"/>
+                </Border>
+                <Border Style="{StaticResource CardBorder}" Margin="0,16,0,0">
+                    <StackPanel>
+                        <TextBlock Text="塗布点追加" Style="{StaticResource BodyLargeStrong}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                        <StackPanel Orientation="Horizontal" Margin="16,16,0,0">
+                            <local:CustomToggleButton Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding IsAutoPlace}" OnText="自動配置" OffText="個数指定"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                            <TextBlock Text="塗布径：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="80"/>
-                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding Size, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                        <StackPanel Orientation="Horizontal" Margin="16,16,0,0" IsEnabled="{Binding AutoPlace}">
+                            <TextBlock Text="Px：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50"/>
+                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding Px, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                            <TextBlock Text="mm" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
+                            <TextBlock Text="Py：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50" Margin="24,0,0,0"/>
+                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding Py, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
                             <TextBlock Text="mm" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
                         </StackPanel>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorder}" Margin="0,16,0,0">
-                <StackPanel>
-                    <TextBlock Text="塗布点追加" Style="{StaticResource BodyLargeStrong}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-                    <StackPanel Orientation="Horizontal" Margin="16,16,0,0">
-                        <local:CustomToggleButton Style="{StaticResource ToggleSwitchStyle}" IsChecked="{Binding IsAutoPlace}" OnText="自動配置" OffText="個数指定"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="16,16,0,0" IsEnabled="{Binding AutoPlace}">
-                        <TextBlock Text="Px：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50"/>
-                        <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding Px, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
-                        <TextBlock Text="mm" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
-                        <TextBlock Text="Py：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50" Margin="24,0,0,0"/>
-                        <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding Py, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
-                        <TextBlock Text="mm" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="16,16,0,0" IsEnabled="{Binding AutoPlace, Converter={StaticResource BooleanInvertConverter}}">
-                        <TextBlock Text="X：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50"/>
-                        <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding CountX, FallbackValue=1, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
-                        <TextBlock Text="個" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
-                        <TextBlock Text="Y：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50" Margin="24,0,0,0"/>
-                        <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding CountY, FallbackValue=1, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
-                        <TextBlock Text="個" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
-                    </StackPanel>
-                    <StackPanel HorizontalAlignment="Right" Margin="0,16,0,0">
-                        <Button Style="{StaticResource AccentTextButton}" Content="実行" Command="{Binding AddPointCommand}" Margin="8,0,0,0" IsEnabled="{Binding IsEdit, Converter={StaticResource BooleanInvertConverter}}"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource CardBorder}" Margin="0,16,0,0">
-                <StackPanel Orientation="Vertical">
-                    <TextBlock Text="塗布点操作" Style="{StaticResource BodyLargeStrong}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-                    <StackPanel Orientation="Vertical" Margin="16,16,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Ox：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50"/>
-                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding OffsetX, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
-                            <TextBlock Text="mm" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
-                            <TextBlock Text="Oy：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50" Margin="24,0,0,0"/>
-                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding OffsetY, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
-                            <TextBlock Text="mm" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
+                        <StackPanel Orientation="Horizontal" Margin="16,16,0,0" IsEnabled="{Binding AutoPlace, Converter={StaticResource BooleanInvertConverter}}">
+                            <TextBlock Text="X：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50"/>
+                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding CountX, FallbackValue=1, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                            <TextBlock Text="個" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
+                            <TextBlock Text="Y：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50" Margin="24,0,0,0"/>
+                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding CountY, FallbackValue=1, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                            <TextBlock Text="個" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-                            <Button Style="{StaticResource IconButton}" Tag="&#xe8c8;" Command="{Binding CopyPointCommand}" ToolTip="コピー"/>
-                            <Button Style="{StaticResource IconButton}" Tag="&#xe7c2;" Command="{Binding MovePointCommand}" ToolTip="移動" Margin="16,0,0,0"/>
-                            <Button Style="{StaticResource IconButton}" Tag="&#xe74d;" Command="{Binding DeletePointCommand}" ToolTip="削除" Margin="16,0,0,0"/>
-                            <Button Style="{StaticResource IconButton}" Tag="&#xf168;" Command="{Binding GroupingPointCommand}" ToolTip="グルーピング" Margin="16,0,0,0"/>
+                        <StackPanel HorizontalAlignment="Right" Margin="0,16,0,0">
+                            <Button Style="{StaticResource AccentTextButton}" Content="実行" Command="{Binding AddPointCommand}" Margin="8,0,0,0" IsEnabled="{Binding IsEdit, Converter={StaticResource BooleanInvertConverter}}"/>
                         </StackPanel>
                     </StackPanel>
-                </StackPanel>
-            </Border>
-        </StackPanel>
+                </Border>
+                <Border Style="{StaticResource CardBorder}" Margin="0,16,0,0">
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock Text="塗布点操作" Style="{StaticResource BodyLargeStrong}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                        <StackPanel Orientation="Vertical" Margin="16,16,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Ox：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50"/>
+                                <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding OffsetX, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                                <TextBlock Text="mm" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
+                                <TextBlock Text="Oy：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"  Width="50" Margin="24,0,0,0"/>
+                                <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding OffsetY, FallbackValue=0.200, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                                <TextBlock Text="mm" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Width="35" Margin="2,0,0,0"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                                <Button Style="{StaticResource IconButton}" Tag="&#xe8c8;" Command="{Binding CopyPointCommand}" ToolTip="コピー"/>
+                                <Button Style="{StaticResource IconButton}" Tag="&#xe7c2;" Command="{Binding MovePointCommand}" ToolTip="移動" Margin="16,0,0,0"/>
+                                <Button Style="{StaticResource IconButton}" Tag="&#xe74d;" Command="{Binding DeletePointCommand}" ToolTip="削除" Margin="16,0,0,0"/>
+                                <Button Style="{StaticResource IconButton}" Tag="&#xf168;" Command="{Binding GroupingPointCommand}" ToolTip="グルーピング" Margin="16,0,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>
 

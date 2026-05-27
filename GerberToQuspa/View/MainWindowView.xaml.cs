@@ -43,6 +43,7 @@ namespace GerberToQuspa
         {
             vm.ViewWidth = mainGrid.ActualWidth;
             vm.ViewHeight = mainGrid.ActualHeight;
+            vm.UpdataViewSize();
         }        
     }
 }
