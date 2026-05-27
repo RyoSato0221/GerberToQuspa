@@ -15,47 +15,98 @@ namespace GerberToQuspa
         public ScaleTransform ScaleTransform { get; } = new ScaleTransform();
         public TranslateTransform TranslateTransform { get; } = new TranslateTransform();
         public TransformGroup Transform { get; } = new TransformGroup();
-        public Point Origin { get; private set; }
-        public double OriginScale { get; private set; }
-        public double OriginOffsetX { get; private set; }
-        public double OriginOffsetY { get; private set; }
-        public int Resolution { get; set; } = 1000;
+        
+        private double _originScale { get; set; }
+        private Rect _originRect { get; set; }
+        private double _originViewWidth { get; set; }
+        private double _originViewHeight { get; set; }
 
-        private Point? _panStartWorld;
+        public double OriginOffsetX => _originViewWidth / 2 - _originRect.Width / 2 * ActualScaleX;
+        public double OriginOffsetY => _originViewHeight / 2 - _originRect.Height / 2 * ActualScaleY;
 
+        private double ActualScaleX => _scale * (_isMirrorX ? -1 : 1);
+        private double ActualScaleY => _scale * (_isMirrorY ? -1 : 1);
+
+        private double _mirrorOffsetX;
+        private double _mirrorOffsetY;
+
+        public Point Origin { get; set; }
+
+        private double _scale = 1.0;
         public double Scale
         {
-            get { return ScaleTransform.ScaleX; }
+            get { return _scale; }
             set
             {
-                ScaleTransform.ScaleX = value;
-                ScaleTransform.ScaleY = value;
-                int thick = (int)(2.0 / value);
-                Thickness = (thick == 0) ? 1 : thick;
-                OnPropertyChanged(nameof(Transform));
+                _scale = value;
+                UpdateTransform();
             }
         }
 
+        private double _offsetX;
         public double OffsetX
         {
-            get { return TranslateTransform.X; }
+            get { return _offsetX; }
             set
             {
-                TranslateTransform.X = value;
-                OnPropertyChanged(nameof(Transform));
+                _offsetX = value;
+                UpdateTransform();
             }
         }
 
+        private double _offsetY;
         public double OffsetY
         {
-            get { return TranslateTransform.Y; }
+            get { return _offsetY; }
             set
             {
-                TranslateTransform.Y = value;
-                OnPropertyChanged(nameof(Transform));
+                _offsetY = value;
+                UpdateTransform();
             }
         }
 
+        private bool _isMirrorX;
+        public bool IsMirrorX
+        {
+            get { return _isMirrorX; }
+            set
+            {
+                _isMirrorX = value;
+                if (_isMirrorX)
+                {
+                    _offsetX += _mirrorOffsetX * _scale / _originScale;
+                }
+                else
+                {
+                    _offsetX -= _mirrorOffsetX * _scale / _originScale;
+                }
+                UpdateTransform();
+            }
+        }
+
+        private bool _isMirrorY;
+        public bool IsMirrorY
+        {
+            get { return _isMirrorY; }
+            set
+            {
+                _isMirrorY = value;
+                if (_isMirrorY)
+                {
+                    _offsetY += _mirrorOffsetY * _scale / _originScale;
+                }
+                else
+                {
+                    _offsetY -= _mirrorOffsetY * _scale / _originScale;
+                }
+                UpdateTransform();
+            }
+        }
+        
+        public int Resolution { get; set; } = 1000;
+        
+        private Point? _panStartWorld;
+        
         /// <summary>
         /// ティーチング原点
         /// </summary>
@@ -89,23 +140,16 @@ namespace GerberToQuspa
         /// <param name="zoomFactor"></param>
         public void ZoomAt(Point screenPos, double zoomFactor)
         {
-            double oldScale = Scale;
-            double newScale = oldScale * zoomFactor;
+            double newScale = _scale * zoomFactor;
+
             newScale = Math.Max(0.00001, Math.Min(50, newScale));
 
             Point worldPos = ScreenToWorld(screenPos);
+            _scale = newScale;
+            _offsetX = screenPos.X - worldPos.X * ActualScaleX;
+            _offsetY = screenPos.Y - worldPos.Y * ActualScaleY;
 
-            Scale = newScale;
-            ScaleTransform.ScaleX = Scale;
-            ScaleTransform.ScaleY = Scale;
-
-            OffsetX = screenPos.X - worldPos.X * newScale;
-            OffsetY = screenPos.Y - worldPos.Y * newScale;
-
-            TranslateTransform.X = OffsetX;
-            TranslateTransform.Y = OffsetY;
-
-            OnPropertyChanged(nameof(Transform));
+            UpdateTransform();
         }
 
         /// <summary>
@@ -119,56 +163,43 @@ namespace GerberToQuspa
 
         public void PanTo(Point screenPos)
         {
-            if (_panStartWorld == null) return;
+            if (_panStartWorld == null)
+            {
+                return;
+            }
 
             Point worldNow = ScreenToWorld(screenPos);
+
             Vector delta = worldNow - _panStartWorld.Value;
+            _offsetX += delta.X * ActualScaleX;
+            _offsetY += delta.Y * ActualScaleY;
 
-            OffsetX += delta.X * Scale;
-            OffsetY += delta.Y * Scale;
-
-            TranslateTransform.X = OffsetX;
-            TranslateTransform.Y = OffsetY;
-
-            OnPropertyChanged(nameof(Transform));
+            UpdateTransform();
         }
 
         public void EndPan()
         {
             _panStartWorld = null;
         }
-
-        public void FitToView(Rect rect, double viewWidth, double viewHeight)
+        
+        public void Fit(Rect rect, double viewWidth, double viewHeight)
         {
             double scaleX = viewWidth / rect.Width;
             double scaleY = viewHeight / rect.Height;
             Scale = Math.Min(scaleX, scaleY);
 
-            OffsetX = viewWidth / 2 - rect.Width / 2 * Scale;
-            OffsetY = viewHeight / 2 - rect.Height / 2 * Scale;
-
-            // 原点（モデル座標系の変換に利用したい場合）
-            Origin = rect.BottomLeft;
-
             // Reset 用に保存
-            OriginScale = Scale;
-            OriginOffsetX = OffsetX;
-            OriginOffsetY = OffsetY;
-        }
+            _originRect = rect;
+            _originViewWidth = viewWidth;
+            _originViewHeight = viewHeight;
+            _originScale = Scale;
+            _offsetX = OriginOffsetX;
+            _offsetY = OriginOffsetY;
 
-        public void FitToWhileData(Rect rect, double viewWidth, double viewHeight)
-        {
-            double scaleX = viewWidth / rect.Width;
-            double scaleY = viewHeight / rect.Height;
-            Scale = Math.Min(scaleX, scaleY);
+            _mirrorOffsetX = _originRect.Width * _scale;
+            _mirrorOffsetY = _originRect.Height * _scale;
 
-            OffsetX = viewWidth / 2 - rect.Width / 2 * Scale - rect.X * Scale; ;
-            OffsetY = viewHeight / 2 - rect.Height / 2 * Scale - rect.Y * Scale;         
-
-            // Reset 用に保存
-            OriginScale = Scale;
-            OriginOffsetX = OffsetX;
-            OriginOffsetY = OffsetY;
+            UpdateTransform();
         }
 
         public void Init()
@@ -178,9 +209,10 @@ namespace GerberToQuspa
 
         public void Reset()
         {
-            Scale = OriginScale;
-            OffsetX = OriginOffsetX;
-            OffsetY = OriginOffsetY;
+            _scale = _originScale;
+            _offsetX = OriginOffsetX;
+            _offsetY = OriginOffsetY;
+            UpdateTransform();
         }
 
         public Point GetVSTeachingOffset
@@ -253,10 +285,28 @@ namespace GerberToQuspa
         public Point ScreenToWorld(Point p)
         {
             return new Point(
-                (p.X - OffsetX) / Scale,
-                (p.Y - OffsetY) / Scale
+                (p.X - _offsetX) / ActualScaleX,
+                (p.Y - _offsetY) / ActualScaleY
             );
-        }        
+        }
+
+        /// <summary>
+        /// Transformの更新
+        /// </summary>
+        private void UpdateTransform()
+        {
+            ScaleTransform.ScaleX = ActualScaleX;
+            ScaleTransform.ScaleY = ActualScaleY;
+           
+            TranslateTransform.X = _offsetX;
+            TranslateTransform.Y = _offsetY;
+
+            int thick = (int)(2.0 / _scale);
+
+            Thickness = (thick == 0) ? 1 : thick;
+
+            OnPropertyChanged(nameof(Transform));
+        }
     }
 
     public class RenderContext : BindableBase

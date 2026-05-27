@@ -51,6 +51,12 @@ namespace GerberToQuspa.ViewModel
             get { return _priority; }
             set { SetProperty(ref _priority, value); }
         }
+
+        /// <summary>
+        /// 軸の反転
+        /// </summary>
+        public bool IsMirrorX { get; set; }
+        public bool IsMirrorY { get; set; }
     }
 
     public class ClusterSettingViewModel : BindableBase
@@ -92,6 +98,20 @@ namespace GerberToQuspa.ViewModel
         {
             get { return Model.Priority; }
             set { SetProperty(() => Model.Priority, v => Model.Priority = v, value); }
+        }
+
+        /// <summary>
+        /// 軸の反転
+        /// </summary>
+        public bool IsMirrorX
+        {
+            get { return Model.IsMirrorX; }
+            set { SetProperty(() => Model.IsMirrorX, v => Model.IsMirrorX = v, value); }
+        }
+        public bool IsMirrorY
+        {
+            get { return Model.IsMirrorY; }
+            set { SetProperty(() => Model.IsMirrorY, v => Model.IsMirrorY = v, value); }
         }
 
         public DelegateCommand ClusterMinSamplesUpCommand { get; }

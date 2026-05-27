@@ -139,7 +139,8 @@ namespace GerberToQuspa
             set
             {
                 SetProperty(ref _GerberData, value);
-                RenderContext.TransformContext.FitToView(_GerberData.ContentBounds, ViewWidth, ViewHeight);
+                RenderContext.TransformContext.Fit(_GerberData.ContentBounds, ViewWidth, ViewHeight);
+                RenderContext.TransformContext.Origin = _GerberData.ContentBounds.BottomLeft;
             }
         }
 
@@ -310,12 +311,23 @@ namespace GerberToQuspa
 
         private void ClusterSettingViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (RenderContext.ClusterList.Count() != 0)
+            switch (e.PropertyName)
             {
-                if (e.PropertyName == nameof(ClusterSettingViewModel.Priority))
-                {
-                    ReCreateRoute();
-                }
+                case nameof(ClusterSettingViewModel.Priority):
+                    if (RenderContext.ClusterList.Count() != 0)
+                    {
+                        if (e.PropertyName == nameof(ClusterSettingViewModel.Priority))
+                        {
+                            ReCreateRoute();
+                        }
+                    }
+                    break;
+                case nameof(ClusterSettingViewModel.IsMirrorX):
+                    RenderContext.TransformContext.IsMirrorX = ClusterSettingViewModel.IsMirrorX;
+                    break;
+                case nameof(ClusterSettingViewModel.IsMirrorY):
+                    RenderContext.TransformContext.IsMirrorY = ClusterSettingViewModel.IsMirrorY;
+                    break;
             }
         }
 
@@ -721,7 +733,7 @@ namespace GerberToQuspa
                     // 5％ずつ余白を設ける
                     rect.Inflate(rect.Width * 0.05, rect.Height * 0.05);
 
-                    RenderContext.TransformContext.FitToWhileData(rect, ViewWidth, ViewHeight);
+                    RenderContext.TransformContext.Fit(rect, ViewWidth, ViewHeight);
                 }
             }
             OnPropertyChanged(nameof(IsEnableCreateRoute));

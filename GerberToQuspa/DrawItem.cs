@@ -13,6 +13,49 @@ using System.Windows.Media;
 namespace GerberToQuspa
 {
     /// <summary>
+    /// Penキャッシュヘルパー
+    /// </summary>
+    public static class PenCacheHelper
+    {
+        /// <summary>
+        /// Penキャッシュ
+        /// </summary>
+        private static readonly Dictionary<string, Pen> _penCache            = new Dictionary<string, Pen>();
+
+        /// <summary>
+        /// Pen取得
+        /// </summary>
+        public static Pen GetPen(Brush brush, double thickness, PenLineCap startCap, PenLineCap endCap)
+        {
+            string key = brush.ToString() + "_" + thickness.ToString() + "_" + startCap.ToString() + "_" + endCap.ToString();
+
+            Pen pen;
+            if (_penCache.TryGetValue(key, out pen))
+            {
+                return pen;
+            }
+
+            pen = new Pen(brush, thickness);
+            pen.StartLineCap = startCap;
+            pen.EndLineCap = endCap;
+
+            pen.Freeze();
+
+            _penCache[key] = pen;
+
+            return pen;
+        }
+
+        /// <summary>
+        /// キャッシュクリア
+        /// </summary>
+        public static void Clear()
+        {
+            _penCache.Clear();
+        }
+    }
+
+    /// <summary>
     /// 描画アイテムインターフェース
     /// </summary>
     public interface IDrawItem
@@ -45,10 +88,7 @@ namespace GerberToQuspa
         {
             Start = start;
             End = end;
-            Stroke = new Pen(isLPD ? Brushes.Green : Brushes.Black, width);
-            Stroke.StartLineCap = PenLineCap.Round;   // 始点を丸く
-            Stroke.EndLineCap = PenLineCap.Round;     // 終点を丸く
-            Stroke.Freeze();
+            Stroke = PenCacheHelper.GetPen(isLPD ? Brushes.Green : Brushes.Black, width, PenLineCap.Round, PenLineCap.Round);
 
             CreateGeometry();
         }
@@ -107,10 +147,7 @@ namespace GerberToQuspa
             Radius = Math.Sqrt(I * I + J * J);
             Center = new Point(Start.X + I, Start.Y + J);
             IsCWArc = isCWArc;
-            Stroke = new Pen(isLPD ? Brushes.Green : Brushes.Black, width);
-            Stroke.StartLineCap = PenLineCap.Round;   // 始点を丸く
-            Stroke.EndLineCap = PenLineCap.Round;     // 終点を丸く
-            Stroke.Freeze();
+            Stroke = PenCacheHelper.GetPen(isLPD ? Brushes.Green : Brushes.Black, width, PenLineCap.Round, PenLineCap.Round);
             CreateGeometry();
         }
 
@@ -214,7 +251,7 @@ namespace GerberToQuspa
             Aperture = aperture;
             Fill = isLPD ? Brushes.Green : Brushes.Black;
             Fill.Freeze();
-            Stroke = new Pen(isLPD ? Brushes.Green : Brushes.Black, 1);
+            Stroke = PenCacheHelper.GetPen(isLPD ? Brushes.Green : Brushes.Black, 1, PenLineCap.Flat, PenLineCap.Flat);
             Stroke.Freeze();
 
             Geometry = Aperture.CreateGeometry(pos, isLPD);

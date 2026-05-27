@@ -85,7 +85,7 @@
                     <TabItem Header="クラスタリングリスト">
                         <view:OperationOrderView DataContext="{Binding OperationOrderVM}"/>
                     </TabItem>
-                    <TabItem Header="クラスタリング設定">
+                    <TabItem Header="設定">
                         <view:ClusterSettingView DataContext="{Binding ClusterSettingViewModel}" />
                     </TabItem>
                     <TabItem Header="操作">

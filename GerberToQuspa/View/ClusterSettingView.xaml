@@ -11,36 +11,53 @@
     
     <Grid Background="White">
         <StackPanel Orientation="Vertical" Margin="16">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="クラスタリング範囲(mm)" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                <local:CustomCheckBox Style="{StaticResource CustomCheckBoxStyle}" Content="自動" IsChecked="{Binding IsEpsAuto}" Margin="16,0,0,0"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="16,5">
-                <StackPanel Orientation="Horizontal" IsEnabled="{Binding IsEpsAuto, Converter={StaticResource BooleanInvertConverter}}">
-                    <TextBlock Text="X方向：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" />
-                    <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding EpsX, FallbackValue=3.000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
-                    <TextBlock Text="Y方向：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Margin="16,0,0,0"/>
-                    <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding EpsY, FallbackValue=3.000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="クラスタリング設定" Style="{StaticResource BodyLargeStrong}" Margin="0,5,0,8"/>
+                    <StackPanel Orientation="Vertical" Margin="16,0,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="クラスタリング範囲(mm)" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                            <local:CustomCheckBox Style="{StaticResource CustomCheckBoxStyle}" Content="自動" IsChecked="{Binding IsEpsAuto}" Margin="16,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="16,5">
+                            <StackPanel Orientation="Horizontal" IsEnabled="{Binding IsEpsAuto, Converter={StaticResource BooleanInvertConverter}}">
+                                <TextBlock Text="X方向：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" />
+                                <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding EpsX, FallbackValue=3.000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Y方向：" Style="{StaticResource BodyLarge}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                                <TextBox Style="{StaticResource CustomTextBoxStyle}" Text="{Binding EpsY, FallbackValue=3.000, StringFormat=F4, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Width="120" HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,5">
+                            <TextBlock Text="クラスタリング最小ポイント数" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
+                            <TextBox Style="{StaticResource CustomTextBoxStyle}" Margin="16,0,0,0" Width="75" Text="{Binding ClusterMinSamples, FallbackValue=3, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                     IsReadOnly="true" Padding="1,1,24,1"/>
+                            <StackPanel Margin="2,0,0,0">
+                                <Button Style="{StaticResource StandardIconButton}" Tag="&#xeb11;" Command="{Binding ClusterMinSamplesUpCommand}"/>
+                                <Button Style="{StaticResource StandardIconButton}" Tag="&#xeb0f;" Command="{Binding ClusterMinSamplesDownCommand}" ToolTip="Fit"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <TextBlock Text="クラスタ内の並び替え優先度" Style="{StaticResource BodyLarge}" Margin="0,5"/>
+                        <StackPanel Orientation="Horizontal" Margin="16,5">
+                            <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="自動(折返し数優先)" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.Auto_Turn}}" Width="200"/>
+                            <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="自動(距離優先)" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.Auto_Distance}}" Width="200"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="16,5">
+                            <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="X方向" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.X}}" Width="200"/>
+                            <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="Y方向" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.Y}}" Width="200"/>
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,5">
-                <TextBlock Text="クラスタリング最小ポイント数" Style="{StaticResource BodyLarge}" VerticalAlignment="Center"/>
-                <TextBox Style="{StaticResource CustomTextBoxStyle}" Margin="16,0,0,0" Width="75" Text="{Binding ClusterMinSamples, FallbackValue=3, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-                                 IsReadOnly="true" Padding="1,1,24,1"/>
-                <StackPanel Margin="2,0,0,0">
-                    <Button Style="{StaticResource StandardIconButton}" Tag="&#xeb11;" Command="{Binding ClusterMinSamplesUpCommand}"/>
-                    <Button Style="{StaticResource StandardIconButton}" Tag="&#xeb0f;" Command="{Binding ClusterMinSamplesDownCommand}" ToolTip="Fit"/>
+            </Border>
+            <Border Style="{StaticResource CardBorder}" Margin="0,16,0,0">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="反転表示" Style="{StaticResource BodyLargeStrong}" Margin="0,5,0,8"/>
+                    <StackPanel Orientation="Horizontal" Margin="16,0,0,0">
+                        <local:CustomCheckBox Style="{StaticResource CustomCheckBoxStyle}" Content="X反転" IsChecked="{Binding IsMirrorX}" Margin="0,0,0,0"/>
+                        <local:CustomCheckBox Style="{StaticResource CustomCheckBoxStyle}" Content="Y反転" IsChecked="{Binding IsMirrorY}" Margin="16,0,0,0"/>
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
-            <TextBlock Text="クラスタ内の並び替え優先度" Style="{StaticResource BodyLarge}" Margin="0,5"/>
-            <StackPanel Orientation="Horizontal" Margin="16,5">
-                <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="自動(折返し数優先)" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.Auto_Turn}}" Width="200"/>
-                <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="自動(距離優先)" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.Auto_Distance}}" Width="200"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="16,5">
-                <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="X方向" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.X}}" Width="200"/>
-                <local:CustomRadioButton Style="{StaticResource CuatomRadioButtonStyle}" Content="Y方向" IsChecked="{Binding Priority, Mode=TwoWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter={x:Static vm:eClusterPriority.Y}}" Width="200"/>
-            </StackPanel>
+            </Border>
+            
         </StackPanel>
     </Grid>
     
