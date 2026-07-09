@@ -232,8 +232,8 @@ namespace GerberToQuspa
             double minY = clusters.Min(p => p.GetCentroid.Y);
             double maxY = clusters.Max(p => p.GetCentroid.Y);
 
-            double stepX = (maxX - minX) / 4.0;
-            double stepY = (maxY - minY) / 4.0;
+            double stepX = Math.Max((maxX - minX) / 4.0, 1e-9);
+            double stepY = Math.Max((maxY - minY) / 4.0, 1e-9);
 
             // 16個のリスト
             List<Cluster>[,] grid = new List<Cluster>[4, 4];
