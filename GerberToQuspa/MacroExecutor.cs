@@ -206,8 +206,8 @@ namespace GerberToQuspa
     class Tokenizer
     {
         // Gerber Macro の数式に対応したトークン抽出
-        static Regex regex = new Regex(@"\$\d+|-?\d+(\.\d+)?|[+\-*Xx/()]");
-        
+        static Regex regex = new Regex(@"\$\d+|-?(?:\d+(?:\.\d+)?|\.\d+)|[+\-*Xx/()]");
+
         public static List<Token> Tokenize(string expr)
         {
             var tokens = new List<Token>();
@@ -226,7 +226,7 @@ namespace GerberToQuspa
                 }
                 else if (char.IsDigit(v[0]) || (v.Length > 1 && v[0] == '-' && char.IsDigit(v[1])))
                 {
-                    if(tokens.Count() != 0)
+                    if (tokens.Count() != 0)
                     {
                         string last = tokens.Last()?.Value;
                         if (last == "X" || last == "x" || last == "*" || last == "/")
@@ -250,7 +250,50 @@ namespace GerberToQuspa
                 else if (v == ")")
                 {
                     tokens.Add(new Token { Type = TokenType.RightParen, Value = v });
-                }                
+                }
+                else if (char.IsDigit(v[0]) ||        
+                    (v.Length > 1 && v[0] == '-' && (char.IsDigit(v[1]) || v[1] == '.')) ||  
+                    (v[0] == '.' && v.Length > 1 && char.IsDigit(v[1])))
+                {
+                    if (v.StartsWith("."))
+                    {
+                        v = "0" + v;
+                    }
+                    else if (v.StartsWith("-."))
+                    {
+                        v = "-0" + v.Substring(1);
+                    }
+
+                    if (tokens.Count != 0)
+                    {
+                        string last = tokens.Last()?.Value;
+
+                        if (last == "X" || last == "x" || last == "*" || last == "/")
+                        {
+                            tokens.Add(new Token
+                            {
+                                Type = TokenType.ConstNumber,
+                                Value = v
+                            });
+                        }
+                        else
+                        {
+                            tokens.Add(new Token
+                            {
+                                Type = TokenType.Number,
+                                Value = v
+                            });
+                        }
+                    }
+                    else
+                    {
+                        tokens.Add(new Token
+                        {
+                            Type = TokenType.Number,
+                            Value = v
+                        });
+                    }
+                }
                 else
                 {
                     tokens.Add(new Token

@@ -1,14 +1,17 @@
-﻿using ClipperLib;
-using GerberToQuspa.ViewModel;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Media.Media3D;
+using ClipperLib;
+using GerberToQuspa.ViewModel;
 
 namespace GerberToQuspa
 {
@@ -69,7 +72,7 @@ namespace GerberToQuspa
         Rect GetBounds();
         List<Point> CreateDispensePoints(OperationModel operationModel);
 
-        void Draw(StreamGeometryContext ctx);
+        //void Draw(StreamGeometryContext ctx);
     }
 
     /// <summary>
@@ -172,6 +175,18 @@ namespace GerberToQuspa
 
         private void CreateGeometry()
         {
+            // 始点と終点が同じ → 完全な円
+            if (Start == End)
+            {
+                Geometry = new EllipseGeometry(
+                    Center,
+                    Radius,
+                    Radius);
+
+                Geometry.Freeze();
+                return;
+            }
+
             StreamGeometry geo = new StreamGeometry();
             using (StreamGeometryContext ctx = geo.Open())
             {
@@ -258,6 +273,80 @@ namespace GerberToQuspa
             Geometry.Freeze();
 
             Pos = pos;
+        }
+
+        public DrawPad(ApertureRect rect, Point start, Point end, bool isLPD)
+        {
+            Aperture = rect;
+            Fill = isLPD ? Brushes.Green : Brushes.Black;
+            Fill.Freeze();
+            Stroke = PenCacheHelper.GetPen(isLPD ? Brushes.Green : Brushes.Black, 1, PenLineCap.Flat, PenLineCap.Flat);
+            Stroke.Freeze();
+
+            Vector direction = end - start;
+            if (direction.LengthSquared > 0)
+            {
+                direction.Normalize();
+
+                double angleRad = Math.Atan2(direction.Y, direction.X);
+                double angleDeg = angleRad * 180.0 / Math.PI;
+
+                double halfWidth = rect.Width / 2.0;
+                double halfHeight = rect.Height / 2.0;
+
+                Point[] points = new Point[6];
+                if (angleDeg >= 0 && angleDeg < 90)
+                {
+                    points[0] = start + new Vector(-halfWidth, -halfHeight);
+                    points[1] = start + new Vector(-halfWidth, +halfHeight);
+                    points[2] = end + new Vector(-halfWidth, +halfHeight);
+                    points[3] = end + new Vector(+halfWidth, +halfHeight);
+                    points[4] = end + new Vector(+halfWidth, -halfHeight);
+                    points[5] = start + new Vector(+halfWidth, -halfHeight);
+                }
+                else if (angleDeg >= 90 && angleDeg < 180)
+                {
+                    points[0] = start + new Vector(+halfWidth, -halfHeight);
+                    points[1] = start + new Vector(+halfWidth, +halfHeight);
+                    points[2] = end + new Vector(+halfWidth, +halfHeight);
+                    points[3] = end + new Vector(-halfWidth, +halfHeight);
+                    points[4] = end + new Vector(-halfWidth, -halfHeight);
+                    points[5] = start + new Vector(-halfWidth, -halfHeight);
+                }
+                else if (angleDeg >=-90 && angleDeg < 0)
+                {
+                    points[0] = start + new Vector(+halfWidth, +halfHeight);
+                    points[1] = start + new Vector(-halfWidth, +halfHeight);
+                    points[2] = end + new Vector(-halfWidth, +halfHeight);
+                    points[3] = end + new Vector(-halfWidth, -halfHeight);
+                    points[4] = end + new Vector(+halfWidth, -halfHeight);
+                    points[5] = start + new Vector(+halfWidth, -halfHeight);
+                }
+                else // angleDeg >= 270 && angleDeg < 360
+                {
+                    points[0] = start + new Vector(-halfWidth, +halfHeight);
+                    points[1] = start + new Vector(+halfWidth, +halfHeight);
+                    points[2] = end + new Vector(+halfWidth, +halfHeight);
+                    points[3] = end + new Vector(+halfWidth, -halfHeight);
+                    points[4] = end + new Vector(-halfWidth, -halfHeight);
+                    points[5] = start + new Vector(-halfWidth, -halfHeight);
+                }
+
+                // StreamGeometry
+                StreamGeometry streamGeo = new StreamGeometry();
+                using (StreamGeometryContext ctx = streamGeo.Open())
+                {
+                    ctx.BeginFigure(points[0], true, true);
+                    ctx.PolyLineTo(points.Skip(1).ToList(), true, true);
+                }
+
+                var pg = Geometry.Combine(streamGeo, Aperture.CreateGeometry(start, isLPD), GeometryCombineMode.Union, null);
+                pg = Geometry.Combine(pg, Aperture.CreateGeometry(end, isLPD), GeometryCombineMode.Union, null);
+
+                Geometry = pg;
+                Geometry.Freeze();
+            }
+            Pos = end;
         }
 
         public void Draw(DrawingContext dc)

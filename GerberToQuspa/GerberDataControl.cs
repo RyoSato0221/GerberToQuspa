@@ -203,6 +203,7 @@ namespace GerberToQuspa
             _buffer.Clear();
 
             int firstChar = -1;
+            bool isMacro = false;
 
             while (true)
             {
@@ -231,26 +232,57 @@ namespace GerberToQuspa
                     continue;
 
                 if (firstChar == -1)
+                {
                     firstChar = c;
+
+                    // %A → Gerber Macro
+                    if (c == '%')
+                    {
+                        _buffer.Append(c);
+
+                        while (true)
+                        {
+                            int next = _reader.Peek();
+                            char nc = (char)next;
+                            if (nc == '\r' || nc == '\n' || nc == '%')
+                            {
+                                _reader.Read();
+                                continue;
+                            }
+                            else
+                            {
+                                if(nc == 'A')
+                                {
+                                    isMacro = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 _buffer.Append(c);
 
-                if (firstChar != '%')
+                if (isMacro)
                 {
-                    if (c == '*')
+                    // Macroは *% までを1まとまり
+                    int len = _buffer.Length;
+
+                    if (len >= 2 &&
+                        _buffer[len - 2] == '*' &&
+                        _buffer[len - 1] == '%')
                     {
-                        _buffer.Length--;
+                        _buffer.Replace("*%", "");
+                        _buffer.Replace("%", "");
                         return _buffer.ToString().Trim();
                     }
                 }
                 else
                 {
-                    int len = _buffer.Length;
-                    if (len >= 2 &&
-                        _buffer[len - 2] == '*' &&
-                        _buffer[len - 1] == '%')
+                    // 通常のGerberコマンドは * で終了
+                    if (c == '*')
                     {
-                        _buffer.Length -= 2;
+                        _buffer.Replace("%", "");
                         return _buffer.ToString().Trim();
                     }
                 }
@@ -306,28 +338,28 @@ namespace GerberToQuspa
                 while ((line = unit.ReadStatement()) != null)
                 {
                     // 単位設定
-                    if (line.StartsWith("%MO"))
+                    if (line.StartsWith("MO"))
                     {
                         CoordinateTransformer.SetScale(line);
                         continue;
                     }
 
                     // フォーマット定義
-                    if (line.StartsWith("%FS"))
+                    if (line.StartsWith("FS"))
                     {
                         CoordinateTransformer.SetFormat(line);
                         continue;
                     }
 
                     // アパーチャ定義
-                    if (line.StartsWith("%AD"))
+                    if (line.StartsWith("AD"))
                     {
                         ParseAperture(line);
                         continue;
                     }
 
                     // アパーチャマクロ定義
-                    if (line.StartsWith("%AM"))
+                    if (line.StartsWith("AM"))
                     {
                         var apertureMacro = ParseApertureMacro(line);
                         if (apertureMacro != null) file.Macros.Add(apertureMacro);
@@ -358,7 +390,7 @@ namespace GerberToQuspa
                     }
 
                     // Dコードの切替
-                    if (line.StartsWith("%LP"))
+                    if (line.StartsWith("LP"))
                     {
                         isLPD = (line.Contains("D"));
                         continue;
@@ -406,7 +438,15 @@ namespace GerberToQuspa
                             {
                                 if (currentInterp == InterpMode.Linear)
                                 {
-                                    AnalysisData.DrawItems.Add(new DrawLine(new Point(currentPosX, currentPosY), new Point(x, y), aperture.GetWidth(), isLPD));
+                                    var apertureRect = aperture as ApertureRect;
+                                    if (apertureRect != null)
+                                    {
+                                        AnalysisData.DrawItems.Add(new DrawPad(apertureRect, new Point(currentPosX, currentPosY), new Point(x, y), isLPD));
+                                    }
+                                    else
+                                    {
+                                        AnalysisData.DrawItems.Add(new DrawLine(new Point(currentPosX, currentPosY), new Point(x, y), aperture.GetWidth(), isLPD));
+                                    }
                                 }
                                 else if (currentInterp == InterpMode.CWArc)
                                 {
@@ -439,7 +479,7 @@ namespace GerberToQuspa
         /// <param name="line"></param>
         private void ParseAperture(string item)
         {
-            var match = Regex.Match(item, @"^%ADD(?<dcode>\d+)(?<name>[^,]+)(?:,(?<param>.*))?$");
+            var match = Regex.Match(item, @"^ADD(?<dcode>\d+)(?<name>[^,]+)(?:,(?<param>.*))?$");
             if (!match.Success) return;
 
             IAperture aperture;
@@ -463,7 +503,7 @@ namespace GerberToQuspa
                     break;
             }
             List<decimal> paramList = match.Groups[3].Value
-                .Split(new char[] { 'X', 'x', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Split(new char[] { 'X', 'x', ',', '*' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(s => decimal.Parse(s, CultureInfo.InvariantCulture))
                 .ToList();
             aperture.SetParameter(paramList, CoordinateTransformer);
@@ -486,7 +526,7 @@ namespace GerberToQuspa
             // マクロを分割
             string[] parts = item.Split('*');
 
-            var match = Regex.Match(parts[0], @"%AM(.+)");
+            var match = Regex.Match(parts[0], @"AM(.+)");
             if (!match.Success) return null;
 
             Macro macro = new Macro();

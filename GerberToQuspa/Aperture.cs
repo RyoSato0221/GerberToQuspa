@@ -119,8 +119,8 @@ namespace GerberToQuspa
     public class ApertureRect : IAperture
     {
         public string key { get; set; }
-        private long Width { get; set; }
-        private long Height { get; set; }
+        public long Width { get; set; }
+        public long Height { get; set; }
         private long HoleDiameter { get; set; }
 
         public void SetParameter(List<decimal> param, CoordinateTransformer transformer)

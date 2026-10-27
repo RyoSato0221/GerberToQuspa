@@ -175,7 +175,10 @@ namespace GerberToQuspa
             set
             {
                 SetProperty(ref _selectAperture, value);
-                GerberData.SetSelectItems(GerberDataControl.GetAperture(_selectAperture.key));
+                if(_selectAperture != null)
+                {
+                    GerberData.SetSelectItems(GerberDataControl.GetAperture(_selectAperture.key));
+                }
                 _padSelectionAdorner.InvalidateVisual();
             }
         }
