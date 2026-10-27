@@ -683,12 +683,6 @@ namespace GerberToQuspa
                     }
                     else
                     {
-                        PointVM data = new PointVM(
-                                double.Parse(splitString[1]) / 10000,
-                                double.Parse(splitString[2]) / 10000,
-                                RenderContext.TransformContext,
-                                (splitString.Count() == 7) ? int.Parse(splitString[6]) : 200);
-
                         if (currentCluster == null)
                         {
                             if (splitString.Count() >= 6)
@@ -713,8 +707,8 @@ namespace GerberToQuspa
                         }
 
                         currentCluster.PointList.Add(new PointVM(
-                            double.Parse(splitString[1]) / 10000,
-                            double.Parse(splitString[2]) / 10000,
+                            double.Parse(splitString[1]) / 10000 + RenderContext.TransformContext.TeachingOffsetX,
+                            double.Parse(splitString[2]) / 10000 + RenderContext.TransformContext.TeachingOffsetY,
                             RenderContext.TransformContext,
                             (splitString.Count() == 7) ? int.Parse(splitString[6]) : 200)
                             );
@@ -784,7 +778,7 @@ namespace GerberToQuspa
 
         private string CreateCsvLine(PointVM item, Cluster cluster)
         {
-            return $"0,{(int)(item.X * 10000)},{(int)(item.Y * 10000)},0,0";
+            return $"0,{(int)(item.DisplayX * 10000)},{(int)(item.DisplayY * 10000)},0,0";
         }
 
         private string CreateTxtLine(PointVM item, Cluster cluster)
